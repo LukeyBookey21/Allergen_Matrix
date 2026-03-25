@@ -39,10 +39,13 @@ def keyword_match(ingredient: str) -> list[str]:
     # Try exact match first
     if ingredient_lower in ALLERGEN_MAP:
         allergens.update(ALLERGEN_MAP[ingredient_lower])
+        return list(allergens)
 
-    # Try substring matching for multi-word keys and ingredient phrases
+    # Try word-boundary substring matching: keyword found within ingredient
     for keyword, allergen_list in ALLERGEN_MAP.items():
-        if keyword in ingredient_lower or ingredient_lower in keyword:
+        # Check if keyword appears as a whole word/phrase in the ingredient
+        pattern = r"(?:^|\s)" + re.escape(keyword) + r"(?:\s|$)"
+        if re.search(pattern, ingredient_lower):
             allergens.update(allergen_list)
 
     return list(allergens)
