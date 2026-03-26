@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUpdateNotes, onClose, onCheckout, isOpen }) {
+export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUpdateNotes, onClose, onCheckout, isOpen, pairingsMap = {}, onAddToCart }) {
   const [tableNumber, setTableNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
@@ -127,6 +127,51 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
               ))}
             </div>
           )}
+
+          {/* Pairing suggestions */}
+          {items.length > 0 && (() => {
+            const suggestions = [];
+            const cartDishIds = new Set(items.map(i => i.dish.id));
+            for (const item of items) {
+              const pairings = pairingsMap[item.dish.id] || [];
+              for (const p of pairings) {
+                const drink = p.drink;
+                if (drink && !cartDishIds.has(drink.id) && !suggestions.find(s => s.drink.id === drink.id)) {
+                  suggestions.push({ foodName: item.dish.name, drink, note: p.note });
+                }
+              }
+            }
+            if (suggestions.length === 0) return null;
+            return (
+              <div className="px-6 py-4 border-t border-stone-100 bg-amber-50/50">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <span>🍷</span> Pairs well with your order
+                </p>
+                <div className="space-y-2">
+                  {suggestions.slice(0, 4).map((s) => (
+                    <div key={s.drink.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-stone-100">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-700 truncate">{s.drink.name}</p>
+                        <p className="text-[11px] text-slate-400 italic truncate">{s.note}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span className="text-xs font-semibold text-amber-700">£{Number(s.drink.price).toFixed(2)}</span>
+                        {onAddToCart && (
+                          <button
+                            onClick={() => onAddToCart(s.drink)}
+                            className="w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center text-sm font-bold hover:bg-amber-600 transition-colors"
+                            aria-label={`Add ${s.drink.name} to order`}
+                          >
+                            +
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer / Checkout */}

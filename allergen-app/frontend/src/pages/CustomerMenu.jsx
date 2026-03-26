@@ -460,7 +460,6 @@ export default function CustomerMenu() {
                       hidePrice={isAfternoonTea}
                       compact={isDrinks}
                       onAddToCart={addToCart}
-                      pairings={pairingsMap[dish.id] || []}
                     />
                   ))}
                 </div>
@@ -508,6 +507,8 @@ export default function CustomerMenu() {
         onClose={() => setCartOpen(false)}
         onCheckout={handleCheckout}
         isOpen={cartOpen}
+        pairingsMap={pairingsMap}
+        onAddToCart={addToCart}
       />
 
       {/* Floating cart button */}
