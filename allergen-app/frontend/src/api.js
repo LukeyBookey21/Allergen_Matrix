@@ -111,3 +111,31 @@ export async function fetchCategories() {
   const res = await fetch("/api/menu/categories");
   return res.json();
 }
+
+export async function submitOrder(orderData) {
+  const res = await fetch("/api/orders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(orderData),
+  });
+  return res.json();
+}
+
+export async function getPairings(dishId) {
+  const res = await fetch(`/api/pairings/${dishId}`);
+  return res.json();
+}
+
+export async function getAdminOrders(status) {
+  const url = status ? `/admin/orders?status=${status}` : "/admin/orders";
+  const res = await apiFetch(url);
+  return res?.json();
+}
+
+export async function updateOrderStatus(orderId, status) {
+  const res = await apiFetch(`/admin/orders/${orderId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+  return res.json();
+}

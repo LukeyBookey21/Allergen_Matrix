@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { getMenus, getMenuBySlug, getAllergens } from "../api";
+import { getMenus, getMenuBySlug, getAllergens, submitOrder, getPairings } from "../api";
 import DishRow from "../components/DishRow";
 import AllergenDrawer from "../components/AllergenDrawer";
+import CartDrawer from "../components/CartDrawer";
 
 const MENU_EMOJIS = {
   "dinner-menu": "\uD83C\uDF7D\uFE0F",
@@ -30,6 +31,10 @@ export default function CustomerMenu() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [menuLoading, setMenuLoading] = useState(false);
+  const [cart, setCart] = useState([]);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [orderPlaced, setOrderPlaced] = useState(null);
+  const [pairingsMap, setPairingsMap] = useState({});
 
   // Load menus list and allergens on mount
   useEffect(() => {
@@ -46,7 +51,9 @@ export default function CustomerMenu() {
       if (targetSlug) {
         const menuData = await getMenuBySlug(targetSlug).catch(() => ({ dishes: [] }));
         setActiveMenu(menuList.find((m) => m.slug === targetSlug) || { slug: targetSlug, name: targetSlug });
-        setDishes(menuData.dishes || menuData || []);
+        const loadedDishes = menuData.dishes || menuData || [];
+        setDishes(loadedDishes);
+        fetchPairings(loadedDishes);
       }
       setLoading(false);
     }
@@ -66,8 +73,10 @@ export default function CustomerMenu() {
     setMenuLoading(true);
     setActiveMenu(menu);
     const menuData = await getMenuBySlug(menu.slug).catch(() => ({ dishes: [] }));
-    setDishes(menuData.dishes || menuData || []);
+    const loadedDishes = menuData.dishes || menuData || [];
+    setDishes(loadedDishes);
     setMenuLoading(false);
+    fetchPairings(loadedDishes);
   }
 
   function handleMenuTab(menu) {
@@ -83,6 +92,73 @@ export default function CustomerMenu() {
 
   function clearAllergens() {
     setSelectedAllergens([]);
+  }
+
+  // Cart functions
+  function addToCart(dish) {
+    setCart(prev => {
+      const existing = prev.find(item => item.dish.id === dish.id);
+      if (existing) {
+        return prev.map(item =>
+          item.dish.id === dish.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      return [...prev, { dish, quantity: 1, notes: "" }];
+    });
+  }
+
+  function updateCartQuantity(dishId, quantity) {
+    if (quantity <= 0) {
+      removeFromCart(dishId);
+      return;
+    }
+    setCart(prev => prev.map(item =>
+      item.dish.id === dishId ? { ...item, quantity } : item
+    ));
+  }
+
+  function removeFromCart(dishId) {
+    setCart(prev => prev.filter(item => item.dish.id !== dishId));
+  }
+
+  function updateCartItemNotes(dishId, notes) {
+    setCart(prev => prev.map(item =>
+      item.dish.id === dishId ? { ...item, notes } : item
+    ));
+  }
+
+  async function handleCheckout(tableNumber, customerName, orderNotes) {
+    const orderData = {
+      table_number: tableNumber,
+      customer_name: customerName,
+      notes: orderNotes,
+      items: cart.map(item => ({
+        menu_item_id: item.dish.id,
+        quantity: item.quantity,
+        notes: item.notes,
+      })),
+    };
+    const result = await submitOrder(orderData);
+    if (result.id) {
+      setOrderPlaced(result);
+      setCart([]);
+      setCartOpen(false);
+    }
+  }
+
+  // Fetch pairings when dishes change
+  async function fetchPairings(dishList) {
+    const drinkCategories = ["Wine", "Beer", "Cocktails", "Soft Drinks", "Hot Drinks"];
+    const foodDishes = dishList.filter(d => !drinkCategories.includes(d.category));
+    const pairingPromises = foodDishes.map(d =>
+      getPairings(d.id).then(p => [d.id, p]).catch(() => [d.id, []])
+    );
+    const pairingResults = await Promise.all(pairingPromises);
+    const newPairingsMap = {};
+    for (const [id, pairings] of pairingResults) {
+      if (pairings.length > 0) newPairingsMap[id] = pairings;
+    }
+    setPairingsMap(newPairingsMap);
   }
 
   // Filter dishes
@@ -266,6 +342,8 @@ export default function CustomerMenu() {
                       mode={mode}
                       hidePrice={isAfternoonTea}
                       compact={isDrinks}
+                      onAddToCart={addToCart}
+                      pairings={pairingsMap[dish.id] || []}
                     />
                   ))}
                 </div>
@@ -303,6 +381,52 @@ export default function CustomerMenu() {
         mode={mode}
         onModeChange={setMode}
       />
+
+      {/* Cart drawer */}
+      <CartDrawer
+        items={cart}
+        onUpdateQuantity={updateCartQuantity}
+        onRemoveItem={removeFromCart}
+        onUpdateNotes={updateCartItemNotes}
+        onClose={() => setCartOpen(false)}
+        onCheckout={handleCheckout}
+        isOpen={cartOpen}
+      />
+
+      {/* Floating cart button */}
+      {cart.length > 0 && (
+        <button
+          onClick={() => setCartOpen(true)}
+          className="fixed bottom-6 right-6 z-40 bg-amber-500 text-white w-14 h-14 rounded-full shadow-lg hover:bg-amber-600 transition-all hover:scale-105 flex items-center justify-center"
+        >
+          <span className="text-xl">&#x1F6D2;</span>
+          <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center">
+            {cart.reduce((sum, item) => sum + item.quantity, 0)}
+          </span>
+        </button>
+      )}
+
+      {/* Order confirmation overlay */}
+      {orderPlaced && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center animate-fade-in">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Order Placed!</h2>
+            <p className="text-slate-500 text-sm mb-1">Order #{orderPlaced.id}</p>
+            <p className="text-slate-500 text-sm mb-4">Your server will be with you shortly.</p>
+            <button
+              onClick={() => setOrderPlaced(null)}
+              className="bg-amber-500 text-white px-6 py-2 rounded-xl font-semibold hover:bg-amber-600 transition-colors"
+            >
+              Back to Menu
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

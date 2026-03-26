@@ -1,9 +1,15 @@
-export default function DishRow({ dish, selectedAllergens = [], mode = "warn", hidePrice = false, compact = false }) {
+import { useState } from "react";
+
+export default function DishRow({ dish, selectedAllergens = [], mode = "warn", hidePrice = false, compact = false, onAddToCart, pairings = [] }) {
+  const [showPairingTip, setShowPairingTip] = useState(false);
+
   const dishAllergenNames = dish.allergens ? dish.allergens.map((a) => a.name) : [];
   const hasConflict = selectedAllergens.some((a) => dishAllergenNames.includes(a));
   const isHidden = hasConflict && mode === "hide";
 
   if (isHidden) return null;
+
+  const pairingNames = pairings.map((p) => p.name || p.drink_name || p).join(", ");
 
   return (
     <div
@@ -12,24 +18,55 @@ export default function DishRow({ dish, selectedAllergens = [], mode = "warn", h
       } ${compact ? "py-2.5" : "py-4"}`}
     >
       {/* Name and price line */}
-      <div className="flex items-baseline gap-2">
-        <h3
-          className={`font-display font-semibold text-slate-800 ${
-            compact ? "text-base" : "text-lg"
-          } leading-tight flex-shrink-0`}
-        >
-          {dish.name}
-          {dish.is_special && (
-            <span className="ml-2 text-amber-500 text-sm align-middle">*</span>
+      <div className="flex items-center gap-2">
+        <div className="flex items-baseline gap-2 flex-1 min-w-0">
+          <h3
+            className={`font-display font-semibold text-slate-800 ${
+              compact ? "text-base" : "text-lg"
+            } leading-tight flex-shrink-0`}
+          >
+            {dish.name}
+            {dish.is_special && (
+              <span className="ml-2 text-amber-500 text-sm align-middle">*</span>
+            )}
+          </h3>
+          {!hidePrice && dish.price > 0 && (
+            <>
+              <span className="menu-row-dots" />
+              <span className="text-amber-700 font-semibold tabular-nums flex-shrink-0">
+                {Number(dish.price).toFixed(2)}
+              </span>
+            </>
           )}
-        </h3>
-        {!hidePrice && dish.price > 0 && (
-          <>
-            <span className="menu-row-dots" />
-            <span className="text-amber-700 font-semibold tabular-nums flex-shrink-0">
-              {Number(dish.price).toFixed(2)}
+
+          {/* Pairing hint */}
+          {pairings.length > 0 && pairingNames && (
+            <span
+              className="relative flex-shrink-0 cursor-default ml-1"
+              onMouseEnter={() => setShowPairingTip(true)}
+              onMouseLeave={() => setShowPairingTip(false)}
+              onTouchStart={() => setShowPairingTip((v) => !v)}
+            >
+              <span className="text-xs opacity-40 hover:opacity-70 transition-opacity">🍷</span>
+              {showPairingTip && (
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-slate-800 text-white text-[11px] rounded-lg whitespace-nowrap shadow-lg z-30 pointer-events-none">
+                  Pairs well with: {pairingNames}
+                  <span className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-slate-800" />
+                </span>
+              )}
             </span>
-          </>
+          )}
+        </div>
+
+        {/* Add to cart button */}
+        {onAddToCart && (
+          <button
+            onClick={() => onAddToCart(dish)}
+            className="flex-shrink-0 w-7 h-7 rounded-full bg-amber-500 text-white flex items-center justify-center opacity-60 sm:opacity-0 group-hover:opacity-100 hover:!opacity-100 focus:opacity-100 transition-all duration-200 hover:bg-amber-600 hover:scale-110 active:scale-95 text-sm font-bold shadow-sm"
+            title="Add to order"
+          >
+            +
+          </button>
         )}
       </div>
 

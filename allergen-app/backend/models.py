@@ -63,6 +63,36 @@ class MenuItemAllergen(db.Model):
     allergen = db.relationship("Allergen")
 
 
+class Order(db.Model):
+    __tablename__ = "order"
+    id = db.Column(db.Integer, primary_key=True)
+    table_number = db.Column(db.String(20), nullable=False)
+    customer_name = db.Column(db.String(100), default="")
+    notes = db.Column(db.Text, default="")
+    status = db.Column(db.String(30), default="pending")  # pending, confirmed, preparing, ready, served, cancelled
+    created_at = db.Column(db.DateTime, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+    items = db.relationship("OrderItem", backref="order", cascade="all, delete-orphan")
+
+class OrderItem(db.Model):
+    __tablename__ = "order_item"
+    id = db.Column(db.Integer, primary_key=True)
+    order_id = db.Column(db.Integer, db.ForeignKey("order.id"), nullable=False)
+    menu_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=False)
+    quantity = db.Column(db.Integer, default=1)
+    notes = db.Column(db.String(300), default="")
+    menu_item = db.relationship("MenuItem")
+
+class Pairing(db.Model):
+    __tablename__ = "pairing"
+    id = db.Column(db.Integer, primary_key=True)
+    food_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=False)
+    drink_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=False)
+    note = db.Column(db.String(200), default="")  # e.g. "Complements the richness"
+    food_item = db.relationship("MenuItem", foreign_keys=[food_item_id])
+    drink_item = db.relationship("MenuItem", foreign_keys=[drink_item_id])
+
+
 SEED_ALLERGENS = [
     ("Celery", "\U0001f33f"),
     ("Gluten", "\U0001f33e"),

@@ -5,7 +5,7 @@ import io
 import qrcode
 from flask import send_file
 
-from models import db, AdminUser, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen
+from models import db, AdminUser, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Order, OrderItem, Pairing
 from parser import parse_and_detect
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -335,6 +335,98 @@ def detect_allergens():
     api_key = current_app.config.get("ANTHROPIC_API_KEY", "")
     result = parse_and_detect(ingredients_text, api_key)
     return jsonify(result)
+
+
+# ── Orders ──────────────────────────────────────────
+
+@admin_bp.route("/orders", methods=["GET"])
+@login_required
+def list_orders():
+    """List all orders, newest first. Optional ?status= filter."""
+    status_filter = request.args.get("status")
+    query = Order.query.order_by(Order.created_at.desc())
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+    orders = query.limit(100).all()
+    result = []
+    for order in orders:
+        result.append({
+            "id": order.id,
+            "table_number": order.table_number,
+            "customer_name": order.customer_name,
+            "notes": order.notes,
+            "status": order.status,
+            "created_at": order.created_at.isoformat() if order.created_at else None,
+            "updated_at": order.updated_at.isoformat() if order.updated_at else None,
+            "items": [
+                {
+                    "id": oi.id,
+                    "menu_item_id": oi.menu_item_id,
+                    "name": oi.menu_item.name if oi.menu_item else "Unknown",
+                    "price": oi.menu_item.price if oi.menu_item else 0,
+                    "quantity": oi.quantity,
+                    "notes": oi.notes,
+                }
+                for oi in order.items
+            ],
+        })
+    return jsonify(result)
+
+
+@admin_bp.route("/orders/<int:order_id>/status", methods=["PATCH"])
+@login_required
+def update_order_status(order_id):
+    """Update order status."""
+    order = Order.query.get_or_404(order_id)
+    data = request.get_json()
+    new_status = data.get("status", "").strip()
+    valid = ["pending", "confirmed", "preparing", "ready", "served", "cancelled"]
+    if new_status not in valid:
+        return jsonify({"error": f"Invalid status. Must be one of: {', '.join(valid)}"}), 400
+    order.status = new_status
+    db.session.commit()
+    return jsonify({"id": order.id, "status": order.status})
+
+
+# ── Pairings ──────────────────────────────────────────
+
+@admin_bp.route("/pairings", methods=["GET"])
+@login_required
+def list_pairings():
+    pairings = Pairing.query.all()
+    return jsonify([
+        {
+            "id": p.id,
+            "food_item_id": p.food_item_id,
+            "food_name": p.food_item.name if p.food_item else None,
+            "drink_item_id": p.drink_item_id,
+            "drink_name": p.drink_item.name if p.drink_item else None,
+            "note": p.note,
+        }
+        for p in pairings
+    ])
+
+@admin_bp.route("/pairings", methods=["POST"])
+@login_required
+def create_pairing():
+    data = request.get_json()
+    food_item_id = data.get("food_item_id")
+    drink_item_id = data.get("drink_item_id")
+    note = data.get("note", "")
+    if not food_item_id or not drink_item_id:
+        return jsonify({"error": "food_item_id and drink_item_id required"}), 400
+    p = Pairing(food_item_id=food_item_id, drink_item_id=drink_item_id, note=note)
+    db.session.add(p)
+    db.session.commit()
+    return jsonify({"id": p.id, "message": "Pairing created"}), 201
+
+@admin_bp.route("/pairings/<int:pairing_id>", methods=["DELETE"])
+@login_required
+def delete_pairing(pairing_id):
+    p = Pairing.query.get_or_404(pairing_id)
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({"message": "Pairing deleted"})
 
 
 @admin_bp.route("/qr-code", methods=["GET"])

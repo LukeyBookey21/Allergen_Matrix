@@ -1,5 +1,5 @@
 """Seed the database with full restaurant menu dishes across all menus."""
-from models import db, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen
+from models import db, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Pairing
 from parser import parse_and_detect
 
 
@@ -719,5 +719,70 @@ def seed_dishes():
                         manually_overridden=False,
                     )
                     db.session.add(ma)
+
+    db.session.commit()
+    seed_pairings()
+
+
+SEED_PAIRINGS = [
+    # Steak pairings
+    {"food": "8oz Sirloin Steak", "drink": "Malbec", "note": "Bold red to match the steak"},
+    {"food": "8oz Sirloin Steak", "drink": "Rioja Reserva", "note": "Oak-aged complexity"},
+    # Sea bass
+    {"food": "Pan-Seared Sea Bass", "drink": "Sancerre", "note": "Crisp white, perfect with fish"},
+    {"food": "Pan-Seared Sea Bass", "drink": "Sauvignon Blanc", "note": "Light and refreshing"},
+    # Chicken
+    {"food": "Breaded Butter Roasted Chicken", "drink": "House White - Pinot Grigio", "note": "Light and crisp"},
+    {"food": "Breaded Butter Roasted Chicken", "drink": "Thwaites Original", "note": "Local Yorkshire ale"},
+    # Burger
+    {"food": "Curious Kitchen Burger", "drink": "BrewDog Punk IPA", "note": "Hoppy kick with the burger"},
+    {"food": "Curious Kitchen Burger", "drink": "Birra Moretti", "note": "Classic lager pairing"},
+    # Fish & chips
+    {"food": "Beer Battered Fish & Chips", "drink": "Thwaites Original", "note": "Ale and fish, a British classic"},
+    {"food": "Beer Battered Fish & Chips", "drink": "Sauvignon Blanc", "note": "Cuts through the batter"},
+    # Risotto
+    {"food": "Wild Mushroom Risotto", "drink": "House White - Pinot Grigio", "note": "Earthy match"},
+    {"food": "Wild Mushroom Risotto", "drink": "Sancerre", "note": "Elegant pairing"},
+    # Sausage trio
+    {"food": "Sausage Trio", "drink": "Malbec", "note": "Rich and hearty"},
+    {"food": "Sausage Trio", "drink": "Thwaites Original", "note": "Traditional pub match"},
+    # Sunday roasts
+    {"food": "Roast Sirloin of Beef", "drink": "Rioja Reserva", "note": "Sunday classic"},
+    {"food": "Roast Sirloin of Beef", "drink": "Malbec", "note": "Bold and beefy"},
+    {"food": "Roast Chicken Supreme", "drink": "Sauvignon Blanc", "note": "Fresh and light"},
+    {"food": "Roast Pork Loin", "drink": "House Red - Merlot", "note": "Smooth and fruity"},
+    # Parfait
+    {"food": "Whipped Chicken Liver Parfait", "drink": "Sancerre", "note": "Classic French pairing"},
+    # Prawns
+    {"food": "Chilled Prawns & Crayfish Tails", "drink": "Prosecco", "note": "Bubbles with seafood"},
+    {"food": "Chilled Prawns & Crayfish Tails", "drink": "Sauvignon Blanc", "note": "Zesty and fresh"},
+    # Bar items
+    {"food": "Steak Sandwich", "drink": "Malbec", "note": "Steak deserves a bold red"},
+    {"food": "Steak Sandwich", "drink": "BrewDog Punk IPA", "note": "Hoppy and satisfying"},
+    {"food": "Club Sandwich", "drink": "Birra Moretti", "note": "Light lager, easy match"},
+    {"food": "Salt & Pepper Squid", "drink": "Prosecco", "note": "Bubbles cut through the spice"},
+    {"food": "Smoked Haddock Fishcake", "drink": "Sauvignon Blanc", "note": "Fresh with the fish"},
+    # Dessert pairings
+    {"food": "Chocolate Fondant", "drink": "Espresso Martini", "note": "Coffee and chocolate heaven"},
+    {"food": "Sticky Toffee Pudding", "drink": "Old Fashioned", "note": "Rich on rich"},
+    {"food": "Lemon Posset", "drink": "Prosecco", "note": "Light and citrusy"},
+]
+
+
+def seed_pairings():
+    """Seed drink pairings if the pairing table is empty."""
+    if Pairing.query.first():
+        return  # Already has pairings, skip
+
+    for pair_data in SEED_PAIRINGS:
+        food_item = MenuItem.query.filter_by(name=pair_data["food"]).first()
+        drink_item = MenuItem.query.filter_by(name=pair_data["drink"]).first()
+        if food_item and drink_item:
+            p = Pairing(
+                food_item_id=food_item.id,
+                drink_item_id=drink_item.id,
+                note=pair_data["note"],
+            )
+            db.session.add(p)
 
     db.session.commit()

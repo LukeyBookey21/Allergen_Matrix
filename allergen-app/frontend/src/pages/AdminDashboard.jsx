@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout } from "../api";
+import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus } from "../api";
 import AllergenBadge from "../components/AllergenBadge";
 
 export default function AdminDashboard() {
@@ -11,6 +11,12 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
   const [menuFilter, setMenuFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
+  const [activeTab, setActiveTab] = useState("menu");
+  const [orders, setOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderStatusFilter, setOrderStatusFilter] = useState("");
+  const ordersInterval = useRef(null);
+  const previousOrderCount = useRef(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,6 +58,54 @@ export default function AdminDashboard() {
     await logout();
     navigate("/admin/login");
   }
+
+  const loadOrders = useCallback(async () => {
+    try {
+      const data = await getAdminOrders(orderStatusFilter);
+      if (data) {
+        if (data.length > previousOrderCount.current && previousOrderCount.current > 0) {
+          // New order arrived - flash the tab
+          document.title = "New Order! - Curious Kitchen Admin";
+          setTimeout(() => { document.title = "Curious Kitchen - Admin"; }, 3000);
+        }
+        previousOrderCount.current = data.length;
+        setOrders(data);
+      }
+    } catch {
+      // silently fail
+    }
+  }, [orderStatusFilter]);
+
+  // Auto-refresh orders every 30 seconds when on orders tab
+  useEffect(() => {
+    if (activeTab === "orders") {
+      setOrdersLoading(true);
+      loadOrders().finally(() => setOrdersLoading(false));
+      ordersInterval.current = setInterval(loadOrders, 30000);
+      return () => clearInterval(ordersInterval.current);
+    }
+    return () => clearInterval(ordersInterval.current);
+  }, [activeTab, loadOrders]);
+
+  async function handleUpdateOrderStatus(orderId, status) {
+    try {
+      await updateOrderStatus(orderId, status);
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    } catch {
+      // silently fail
+    }
+  }
+
+  const STATUS_COLORS = {
+    pending: "bg-yellow-100 text-yellow-800",
+    confirmed: "bg-blue-100 text-blue-800",
+    preparing: "bg-orange-100 text-orange-800",
+    ready: "bg-green-100 text-green-800",
+    served: "bg-gray-100 text-gray-500",
+    cancelled: "bg-red-100 text-red-700",
+  };
+
+  const STATUS_OPTIONS = ["pending", "confirmed", "preparing", "ready", "served", "cancelled"];
 
   const totalDishes = dishes.length;
   const activeDishes = dishes.filter((d) => d.active).length;
@@ -110,6 +164,37 @@ export default function AdminDashboard() {
       </header>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Main tabs: Menu Items | Orders */}
+        <div className="flex gap-1 mb-6 bg-stone-100 p-1 rounded-xl w-fit">
+          <button
+            onClick={() => setActiveTab("menu")}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              activeTab === "menu"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Menu Items
+          </button>
+          <button
+            onClick={() => setActiveTab("orders")}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${
+              activeTab === "orders"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Orders
+            {orders.filter(o => o.status === "pending").length > 0 && (
+              <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                {orders.filter(o => o.status === "pending").length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {activeTab === "menu" && (
+        <>
         {/* Stats bar */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm">
@@ -470,6 +555,144 @@ export default function AdminDashboard() {
               })}
             </div>
           </>
+        )}
+        </>
+        )}
+
+        {/* Orders Tab */}
+        {activeTab === "orders" && (
+          <div>
+            {/* Status filter */}
+            <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
+              <button
+                onClick={() => setOrderStatusFilter("")}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                  orderStatusFilter === ""
+                    ? "bg-slate-800 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-stone-100"
+                }`}
+              >
+                All Orders
+              </button>
+              {STATUS_OPTIONS.map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setOrderStatusFilter(status)}
+                  className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 capitalize ${
+                    orderStatusFilter === status
+                      ? "bg-slate-800 text-white shadow-sm"
+                      : "text-slate-500 hover:bg-stone-100"
+                  }`}
+                >
+                  {status}
+                </button>
+              ))}
+            </div>
+
+            {/* Refresh button */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-slate-400">
+                {orders.length} {orders.length === 1 ? "order" : "orders"}
+              </p>
+              <button
+                onClick={() => { setOrdersLoading(true); loadOrders().finally(() => setOrdersLoading(false)); }}
+                className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1.5 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${ordersLoading ? "animate-spin" : ""}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+
+            {ordersLoading && orders.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-slate-400 text-sm font-medium">Loading orders...</p>
+              </div>
+            ) : orders.length === 0 ? (
+              <div className="text-center py-16 animate-fade-in">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-stone-100 mb-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <p className="text-slate-500 font-medium">No orders found</p>
+                <p className="text-slate-400 text-sm mt-1">Orders will appear here when customers place them.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {orders.map((order) => (
+                  <div key={order.id} className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-bold text-slate-800">Order #{order.id}</h3>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[order.status] || "bg-gray-100 text-gray-500"}`}>
+                          {order.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-slate-500">
+                        {order.table_number && (
+                          <span className="flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1z" clipRule="evenodd" />
+                            </svg>
+                            Table {order.table_number}
+                          </span>
+                        )}
+                        {order.customer_name && (
+                          <span>{order.customer_name}</span>
+                        )}
+                        {order.created_at && (
+                          <span className="text-slate-400">
+                            {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Order items */}
+                    {order.items && order.items.length > 0 && (
+                      <div className="bg-stone-50 rounded-lg p-3 mb-3">
+                        <div className="space-y-1.5">
+                          {order.items.map((item, idx) => (
+                            <div key={idx} className="flex items-center justify-between text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="text-slate-400 text-xs font-medium w-5">{item.quantity}x</span>
+                                <span className="text-slate-700">{item.name || item.menu_item_name || `Item #${item.menu_item_id}`}</span>
+                              </div>
+                              {item.notes && (
+                                <span className="text-xs text-slate-400 italic truncate max-w-[150px]">{item.notes}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Order notes */}
+                    {order.notes && (
+                      <p className="text-sm text-slate-500 italic mb-3">Note: {order.notes}</p>
+                    )}
+
+                    {/* Status update */}
+                    <div className="flex items-center gap-2 pt-3 border-t border-stone-100">
+                      <label className="text-xs text-slate-400 font-medium">Update status:</label>
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleUpdateOrderStatus(order.id, e.target.value)}
+                        className="text-sm border border-stone-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent bg-white capitalize"
+                      >
+                        {STATUS_OPTIONS.map((s) => (
+                          <option key={s} value={s} className="capitalize">{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
