@@ -34,7 +34,7 @@ def get_menu():
             return jsonify([])
         query = query.filter_by(menu_id=menu.id)
 
-    dishes = query.order_by(MenuItem.name).all()
+    dishes = query.order_by(MenuItem.id).all()
     result = []
     for dish in dishes:
         allergens = []
@@ -100,8 +100,9 @@ def create_order():
             return jsonify({"error": "Each item must have a valid menu_item_id"}), 400
         if not isinstance(quantity, int) or quantity < 1 or quantity > 99:
             return jsonify({"error": "Quantity must be an integer between 1 and 99"}), 400
-        if not MenuItem.query.get(menu_item_id):
-            return jsonify({"error": f"Menu item {menu_item_id} does not exist"}), 400
+        menu_item = MenuItem.query.get(menu_item_id)
+        if not menu_item or not menu_item.active:
+            return jsonify({"error": f"Item '{menu_item_id}' is not available"}), 400
 
     order = Order(table_number=table_number, customer_name=customer_name, notes=notes)
     db.session.add(order)

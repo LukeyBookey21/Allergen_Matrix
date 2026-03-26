@@ -19,8 +19,8 @@ def create_app():
     app = Flask(__name__, static_folder=None)
     app.config.from_object(Config)
 
-    # CORS for local dev
-    CORS(app, supports_credentials=True, origins=["http://localhost:3000", "http://localhost:5173"])
+    # CORS
+    CORS(app, supports_credentials=True)
 
     # Database
     db.init_app(app)

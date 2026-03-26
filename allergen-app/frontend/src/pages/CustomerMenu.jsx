@@ -190,7 +190,12 @@ export default function CustomerMenu() {
     if (!grouped[cat]) grouped[cat] = [];
     grouped[cat].push(dish);
   }
-  const orderedCategories = Object.keys(grouped);
+  const CATEGORY_ORDER = ["Starters", "Nibbles", "Sandwiches", "Scones", "Sweet Treats", "Light Bites", "Mains", "Sides", "Desserts", "Wine", "Beer", "Cocktails", "Soft Drinks", "Hot Drinks", "Other"];
+  const orderedCategories = Object.keys(grouped).sort((a, b) => {
+    const ai = CATEGORY_ORDER.indexOf(a);
+    const bi = CATEGORY_ORDER.indexOf(b);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
 
   const isAfternoonTea = activeMenu?.slug === "afternoon-tea";
   const isDrinks = activeMenu?.slug === "drinks";
@@ -296,6 +301,13 @@ export default function CustomerMenu() {
           </div>
         )}
       </header>
+
+      {/* Menu description (e.g. afternoon tea pricing) */}
+      {activeMenu?.description && (
+        <p className="text-center text-sm text-slate-500 italic mt-2 max-w-md mx-auto">
+          {activeMenu.description}
+        </p>
+      )}
 
       {/* Active allergens indicator bar */}
       {selectedAllergens.length > 0 && (
