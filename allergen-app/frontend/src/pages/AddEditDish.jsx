@@ -59,6 +59,7 @@ export default function AddEditDish() {
   const [menuSlug, setMenuSlug] = useState(searchParams.get("menu") || "");
   const [menus, setMenus] = useState([]);
   const [isSpecial, setIsSpecial] = useState(false);
+  const [dietaryLabels, setDietaryLabels] = useState("");
   const [ingredients, setIngredients] = useState("");
   const [selectedAllergens, setSelectedAllergens] = useState([]);
   const [aiDetectedAllergens, setAiDetectedAllergens] = useState([]);
@@ -86,6 +87,7 @@ export default function AddEditDish() {
           setCategory(dish.category || "Mains");
           setMenuSlug(dish.menu_slug || dish.menu_id || "");
           setIsSpecial(dish.is_special || false);
+          setDietaryLabels(dish.dietary_labels || "");
           setIngredients(
             (dish.ingredients || []).map((i) => i.raw_text).join("\n")
           );
@@ -129,6 +131,7 @@ export default function AddEditDish() {
       category,
       menu_slug: menuSlug,
       is_special: isSpecial,
+      dietary_labels: dietaryLabels,
       ingredients,
       allergen_names: selectedAllergens,
     };
@@ -312,6 +315,35 @@ export default function AddEditDish() {
                   >
                     <span className={`toggle-dot ${isSpecial ? "translate-x-5" : "translate-x-1"}`} />
                   </button>
+                </div>
+
+                {/* Dietary Labels */}
+                <div className="pt-2">
+                  <span className="text-sm font-medium text-slate-700 block mb-2">Dietary Labels</span>
+                  <div className="flex gap-2">
+                    {["V", "VG", "GF"].map(label => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => {
+                          setDietaryLabels(prev => {
+                            const labels = prev.split(",").map(l => l.trim()).filter(Boolean);
+                            if (labels.includes(label)) return labels.filter(l => l !== label).join(",");
+                            return [...labels, label].join(",");
+                          });
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+                          dietaryLabels.split(",").map(l => l.trim()).includes(label)
+                            ? label === "VG" ? "bg-green-600 text-white" :
+                              label === "V" ? "bg-green-500 text-white" :
+                              "bg-amber-500 text-white"
+                            : "bg-stone-100 text-stone-500"
+                        }`}
+                      >
+                        {label === "V" ? "Vegetarian" : label === "VG" ? "Vegan" : "Gluten Free"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

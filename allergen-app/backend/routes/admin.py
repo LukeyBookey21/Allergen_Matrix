@@ -163,6 +163,7 @@ def list_dishes():
             "menu_id": dish.menu_id,
             "menu_name": dish.menu.name if dish.menu else None,
             "menu_slug": dish.menu.slug if dish.menu else None,
+            "dietary_labels": dish.dietary_labels,
             "ingredients": [{"id": i.id, "raw_text": i.raw_text, "parsed_name": i.parsed_name} for i in dish.ingredients],
             "allergens": allergens,
         })
@@ -193,9 +194,10 @@ def add_dish():
     image_url = data.get("image_url", "")
     menu_id = _resolve_menu_id(data)
 
+    dietary_labels = data.get("dietary_labels", "")
     dish = MenuItem(name=name, description=description, price=float(price), active=True,
                     category=category, is_special=is_special, image_url=image_url,
-                    menu_id=menu_id)
+                    menu_id=menu_id, dietary_labels=dietary_labels)
     db.session.add(dish)
     db.session.flush()
 
@@ -249,6 +251,7 @@ def edit_dish(dish_id):
     dish.category = data.get("category", dish.category)
     dish.is_special = data.get("is_special", dish.is_special)
     dish.image_url = data.get("image_url", dish.image_url)
+    dish.dietary_labels = data.get("dietary_labels", dish.dietary_labels)
 
     # Update menu assignment if provided
     if "menu_id" in data or "menu_slug" in data:

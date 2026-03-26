@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { getMenus, getMenuBySlug, getAllergens, submitOrder, getPairings } from "../api";
 import DishRow from "../components/DishRow";
@@ -31,11 +31,19 @@ export default function CustomerMenu() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [menuLoading, setMenuLoading] = useState(false);
-  const [cart, setCart] = useState([]);
+  const [cart, setCart] = useState(() => {
+    try {
+      const saved = localStorage.getItem("ck-cart");
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [cartOpen, setCartOpen] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(null);
+  const [trackingOrder, setTrackingOrder] = useState(null);
+  const trackingInterval = useRef(null);
   const [pairingsMap, setPairingsMap] = useState({});
   const [error, setError] = useState(null);
+  const [dietaryFilters, setDietaryFilters] = useState([]);
 
   // Load menus list and allergens on mount
   useEffect(() => {
@@ -70,6 +78,20 @@ export default function CustomerMenu() {
     }
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist cart to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("ck-cart", JSON.stringify(cart));
+    } catch {}
+  }, [cart]);
+
+  // Clean up tracking interval on unmount
+  useEffect(() => {
+    return () => {
+      if (trackingInterval.current) clearInterval(trackingInterval.current);
+    };
+  }, []);
 
   // When menuSlug changes via navigation, load that menu
   useEffect(() => {
@@ -160,6 +182,26 @@ export default function CustomerMenu() {
     }
   }
 
+  async function startTracking(orderId) {
+    setTrackingOrder(null);
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch(`/api/orders/${orderId}`);
+        if (res.ok) setTrackingOrder(await res.json());
+      } catch {}
+    };
+    await fetchStatus();
+    trackingInterval.current = setInterval(fetchStatus, 10000);
+  }
+
+  function stopTracking() {
+    if (trackingInterval.current) {
+      clearInterval(trackingInterval.current);
+      trackingInterval.current = null;
+    }
+    setTrackingOrder(null);
+  }
+
   // Fetch pairings when dishes change
   async function fetchPairings(dishList) {
     const drinkCategories = ["Wine", "Beer", "Cocktails", "Soft Drinks", "Hot Drinks"];
@@ -178,9 +220,16 @@ export default function CustomerMenu() {
   // Filter dishes
   const filteredDishes = dishes.filter((dish) => {
     if (!dish.active && dish.active !== undefined) return false;
-    if (mode !== "hide") return true;
-    const dishAllergenNames = dish.allergens ? dish.allergens.map((a) => a.name) : [];
-    return !selectedAllergens.some((a) => dishAllergenNames.includes(a));
+    if (mode === "hide") {
+      const dishAllergenNames = dish.allergens ? dish.allergens.map((a) => a.name) : [];
+      if (selectedAllergens.some((a) => dishAllergenNames.includes(a))) return false;
+    }
+    // dietary filter
+    if (dietaryFilters.length > 0) {
+      const dishLabels = (dish.dietary_labels || "").split(",").map(l => l.trim());
+      if (!dietaryFilters.every(f => dishLabels.includes(f))) return false;
+    }
+    return true;
   });
 
   // Group by category
@@ -238,21 +287,41 @@ export default function CustomerMenu() {
       {/* Elegant restaurant header */}
       <header className="bg-slate-800 text-white">
         <div className="max-w-3xl mx-auto px-4 pt-10 pb-6 text-center relative">
-          {/* Allergen filter button - top right */}
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="absolute right-4 top-4 flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-xs font-medium bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-full"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
-            </svg>
-            Allergens
-            {selectedAllergens.length > 0 && (
-              <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold">
-                {selectedAllergens.length}
-              </span>
-            )}
-          </button>
+          {/* Dietary filter + Allergen filter buttons - top right */}
+          <div className="absolute right-4 top-4 flex items-center gap-1.5">
+            {["V", "VG", "GF"].map(label => (
+              <button
+                key={label}
+                onClick={() => setDietaryFilters(prev =>
+                  prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+                )}
+                className={`w-7 h-7 rounded-full text-[10px] font-bold transition-all ${
+                  dietaryFilters.includes(label)
+                    ? label === "VG" ? "bg-green-600 text-white ring-2 ring-green-400" :
+                      label === "V" ? "bg-green-500 text-white ring-2 ring-green-300" :
+                      "bg-amber-500 text-white ring-2 ring-amber-300"
+                    : "bg-slate-700/50 text-slate-400 hover:text-white hover:bg-slate-700"
+                }`}
+                title={label === "V" ? "Vegetarian" : label === "VG" ? "Vegan" : "Gluten Free"}
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors text-xs font-medium bg-slate-700/50 hover:bg-slate-700 px-3 py-1.5 rounded-full"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
+              </svg>
+              Allergens
+              {selectedAllergens.length > 0 && (
+                <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                  {selectedAllergens.length}
+                </span>
+              )}
+            </button>
+          </div>
 
           {/* Decorative line */}
           <div className="flex items-center justify-center gap-3 mb-4">
@@ -483,11 +552,68 @@ export default function CustomerMenu() {
               </div>
             )}
             <p className="text-slate-500 text-sm mb-4">Your server will be with you shortly.</p>
+            <div className="flex gap-2 justify-center">
+              <button
+                onClick={() => {
+                  startTracking(orderPlaced.id);
+                  setOrderPlaced(null);
+                }}
+                className="bg-slate-800 text-white px-5 py-2 rounded-xl font-semibold hover:bg-slate-700 transition-colors text-sm"
+              >
+                Track Order
+              </button>
+              <button
+                onClick={() => setOrderPlaced(null)}
+                className="bg-amber-500 text-white px-5 py-2 rounded-xl font-semibold hover:bg-amber-600 transition-colors text-sm"
+              >
+                Back to Menu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Order tracking overlay */}
+      {trackingOrder && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center animate-fade-in">
+            <h2 className="text-xl font-bold text-slate-800 mb-2">Order #{trackingOrder.id}</h2>
+            {trackingOrder.table_number && (
+              <p className="text-slate-500 text-sm mb-3">Table {trackingOrder.table_number}</p>
+            )}
+            <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize mb-4 ${
+              trackingOrder.status === "pending" ? "bg-yellow-100 text-yellow-800" :
+              trackingOrder.status === "confirmed" ? "bg-blue-100 text-blue-800" :
+              trackingOrder.status === "preparing" ? "bg-orange-100 text-orange-800" :
+              trackingOrder.status === "ready" ? "bg-green-100 text-green-800" :
+              trackingOrder.status === "served" ? "bg-gray-100 text-gray-500" :
+              "bg-slate-100 text-slate-600"
+            }`}>
+              {trackingOrder.status}
+            </span>
+            {trackingOrder.items && trackingOrder.items.length > 0 && (
+              <div className="text-left bg-stone-50 rounded-lg p-3 mb-4">
+                {trackingOrder.items.map((item, idx) => (
+                  <div key={idx} className="text-sm text-slate-600 py-0.5">
+                    {item.quantity}x {item.menu_item_name || item.name || "Item"}
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-sm mb-4 font-medium">
+              {trackingOrder.status === "ready" ? (
+                <span className="text-green-600">Your order is ready!</span>
+              ) : trackingOrder.status === "served" ? (
+                <span className="text-gray-500">Your order has been served.</span>
+              ) : (
+                <span className="text-slate-500">Your order is being prepared...</span>
+              )}
+            </p>
             <button
-              onClick={() => setOrderPlaced(null)}
-              className="bg-amber-500 text-white px-6 py-2 rounded-xl font-semibold hover:bg-amber-600 transition-colors"
+              onClick={stopTracking}
+              className="bg-amber-500 text-white px-6 py-2 rounded-xl font-semibold hover:bg-amber-600 transition-colors text-sm"
             >
-              Back to Menu
+              Close
             </button>
           </div>
         </div>

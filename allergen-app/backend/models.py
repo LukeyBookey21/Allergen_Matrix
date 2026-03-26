@@ -35,6 +35,8 @@ class MenuItem(db.Model):
     category = db.Column(db.String(50), default="Mains")
     is_special = db.Column(db.Boolean, default=False)
     image_url = db.Column(db.String(500), default="")
+    dietary_labels = db.Column(db.String(100), default="")
+    display_order = db.Column(db.Integer, default=0)
     ingredients = db.relationship("Ingredient", backref="menu_item", cascade="all, delete-orphan")
     allergens = db.relationship("MenuItemAllergen", backref="menu_item", cascade="all, delete-orphan")
 

@@ -58,6 +58,7 @@ def get_menu():
             "menu_id": dish.menu_id,
             "menu_name": dish.menu.name if dish.menu else None,
             "menu_slug": dish.menu.slug if dish.menu else None,
+            "dietary_labels": dish.dietary_labels,
         }
         result.append(dish_data)
     return jsonify(result)
@@ -143,6 +144,31 @@ def create_order():
         "total": round(total, 2),
         "message": "Order placed",
     }), 201
+
+
+@public_bp.route("/orders/<int:order_id>", methods=["GET"])
+def get_order_status(order_id):
+    """Customer can check their order status."""
+    order = Order.query.get_or_404(order_id)
+    order_items = []
+    total = 0.0
+    for oi in order.items:
+        item_price = oi.menu_item.price if oi.menu_item else 0
+        item_total = item_price * oi.quantity
+        total += item_total
+        order_items.append({
+            "name": oi.menu_item.name if oi.menu_item else "Unknown",
+            "quantity": oi.quantity,
+            "price": item_price,
+        })
+    return jsonify({
+        "id": order.id,
+        "table_number": order.table_number,
+        "status": order.status,
+        "items": order_items,
+        "total": round(total, 2),
+        "created_at": order.created_at.isoformat() if order.created_at else None,
+    })
 
 
 @public_bp.route("/pairings/<int:dish_id>", methods=["GET"])

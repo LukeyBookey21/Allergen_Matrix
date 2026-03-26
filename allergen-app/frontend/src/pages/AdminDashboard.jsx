@@ -413,7 +413,23 @@ export default function AdminDashboard() {
                         className={`group hover:bg-stone-50 transition-colors ${!dish.active ? "opacity-50" : ""}`}
                       >
                         <td className="px-5 py-3.5">
-                          <span className="font-medium text-slate-800">{dish.name}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-medium text-slate-800">{dish.name}</span>
+                            {dish.dietary_labels && dish.dietary_labels.split(",").map(label => label.trim()).filter(Boolean).map(label => (
+                              <span
+                                key={label}
+                                className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0 ${
+                                  label === "VG" ? "bg-green-600 text-white" :
+                                  label === "V" ? "bg-green-500 text-white" :
+                                  label === "GF" ? "bg-amber-500 text-white" :
+                                  "bg-slate-400 text-white"
+                                }`}
+                                title={label === "V" ? "Vegetarian" : label === "VG" ? "Vegan" : label === "GF" ? "Gluten Free" : label}
+                              >
+                                {label}
+                              </span>
+                            ))}
+                          </div>
                         </td>
                         <td className="px-5 py-3.5">
                           <span className="text-xs text-slate-400">{dishMenu?.name || "---"}</span>
@@ -501,7 +517,23 @@ export default function AdminDashboard() {
                   >
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="font-semibold text-slate-800">{dish.name}</h3>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className="font-semibold text-slate-800">{dish.name}</h3>
+                          {dish.dietary_labels && dish.dietary_labels.split(",").map(label => label.trim()).filter(Boolean).map(label => (
+                            <span
+                              key={label}
+                              className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0 ${
+                                label === "VG" ? "bg-green-600 text-white" :
+                                label === "V" ? "bg-green-500 text-white" :
+                                label === "GF" ? "bg-amber-500 text-white" :
+                                "bg-slate-400 text-white"
+                              }`}
+                              title={label === "V" ? "Vegetarian" : label === "VG" ? "Vegan" : label === "GF" ? "Gluten Free" : label}
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           {dishMenu && (
                             <>

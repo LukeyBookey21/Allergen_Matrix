@@ -30,6 +30,20 @@ export default function DishRow({ dish, selectedAllergens = [], mode = "warn", h
               <span className="ml-2 text-amber-500 text-sm align-middle">*</span>
             )}
           </h3>
+          {dish.dietary_labels && dish.dietary_labels.split(",").map(label => label.trim()).filter(Boolean).map(label => (
+            <span
+              key={label}
+              className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0 ${
+                label === "VG" ? "bg-green-600 text-white" :
+                label === "V" ? "bg-green-500 text-white" :
+                label === "GF" ? "bg-amber-500 text-white" :
+                "bg-slate-400 text-white"
+              }`}
+              title={label === "V" ? "Vegetarian" : label === "VG" ? "Vegan" : label === "GF" ? "Gluten Free" : label}
+            >
+              {label}
+            </span>
+          ))}
           {!hidePrice && dish.price > 0 && (
             <>
               <span className="menu-row-dots" />

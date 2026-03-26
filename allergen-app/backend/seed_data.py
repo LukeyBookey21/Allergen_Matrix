@@ -15,6 +15,7 @@ SAMPLE_DISHES = [
         "price": 8.95,
         "category": "Starters",
         "ingredients": "heritage beetroot\nblack garlic\nyogurt\nred onion\nvinegar\nsunflower seeds\ngoats cheese",
+        "dietary": "V",
     },
     {
         "menu_slug": "dinner",
@@ -47,6 +48,7 @@ SAMPLE_DISHES = [
         "price": 9.50,
         "category": "Starters",
         "ingredients": "goats cheese\nbeetroot\npistachio\nbalsamic vinegar\nmixed leaves\nolive oil",
+        "dietary": "V",
     },
     # Mains
     {
@@ -88,6 +90,7 @@ SAMPLE_DISHES = [
         "price": 15.50,
         "category": "Mains",
         "ingredients": "arborio rice\nwild mushrooms\nonion\ngarlic\nwhite wine\nparmesan\ntruffle oil\nbalsamic vinegar\nbutter",
+        "dietary": "V",
     },
     {
         "menu_slug": "dinner",
@@ -138,6 +141,7 @@ SAMPLE_DISHES = [
         "price": 4.50,
         "category": "Sides",
         "ingredients": "potatoes\nvegetable oil\nsalt",
+        "dietary": "V,VG,GF",
     },
     {
         "menu_slug": "dinner",
@@ -146,6 +150,7 @@ SAMPLE_DISHES = [
         "price": 4.50,
         "category": "Sides",
         "ingredients": "seasonal vegetables\nbutter",
+        "dietary": "V,VG,GF",
     },
     {
         "menu_slug": "dinner",
@@ -154,6 +159,7 @@ SAMPLE_DISHES = [
         "price": 4.00,
         "category": "Sides",
         "ingredients": "mixed leaves\ncherry tomatoes\nbalsamic vinegar\nolive oil",
+        "dietary": "V,VG,GF",
     },
     {
         "menu_slug": "dinner",
@@ -162,6 +168,7 @@ SAMPLE_DISHES = [
         "price": 3.25,
         "category": "Sides",
         "ingredients": "bread flour\nyeast\nolive oil\nbalsamic vinegar",
+        "dietary": "V,VG",
     },
 
     # ──────────────────────────────────────────────
@@ -175,6 +182,7 @@ SAMPLE_DISHES = [
         "price": 4.00,
         "category": "Nibbles",
         "ingredients": "cashew nuts\nhoney",
+        "dietary": "V,VG,GF",
     },
     {
         "menu_slug": "bar-lounge",
@@ -183,6 +191,7 @@ SAMPLE_DISHES = [
         "price": 4.00,
         "category": "Nibbles",
         "ingredients": "olives\nolive oil\nchilli\ngarlic\nherbs",
+        "dietary": "V,VG,GF",
     },
     {
         "menu_slug": "bar-lounge",
@@ -240,6 +249,7 @@ SAMPLE_DISHES = [
         "price": 11.50,
         "category": "Light Bites",
         "ingredients": "halloumi\navocado\ntortilla wrap\nroasted peppers\nrocket\nsweet chilli sauce",
+        "dietary": "V",
     },
     {
         "menu_slug": "bar-lounge",
@@ -269,6 +279,7 @@ SAMPLE_DISHES = [
         "price": 0,
         "category": "Sandwiches",
         "ingredients": "egg\nmayonnaise\ncress\nbread",
+        "dietary": "V",
     },
     {
         "menu_slug": "afternoon-tea",
@@ -285,6 +296,7 @@ SAMPLE_DISHES = [
         "price": 0,
         "category": "Sandwiches",
         "ingredients": "cucumber\ncream cheese\nmint\nbread",
+        "dietary": "V",
     },
     # Scones
     {
@@ -389,6 +401,7 @@ SAMPLE_DISHES = [
         "price": 14.95,
         "category": "Mains",
         "ingredients": "cashew nuts\nwalnuts\nbreadcrumbs\nonion\nherbs\negg\npotatoes\nseasonal vegetables",
+        "dietary": "V",
     },
     # Desserts
     {
@@ -694,6 +707,7 @@ def seed_dishes():
             category=dish_data.get("category", "Mains"),
             menu_id=menu_id,
             active=True,
+            dietary_labels=dish_data.get("dietary", ""),
         )
         db.session.add(dish)
         db.session.flush()
