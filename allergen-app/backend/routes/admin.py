@@ -1,3 +1,5 @@
+import re
+
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
@@ -65,6 +67,10 @@ def create_menu():
     slug = data.get("slug", "").strip()
     if not name or not slug:
         return jsonify({"error": "Name and slug are required"}), 400
+    if len(name) > 200:
+        return jsonify({"error": "Name must be 1-200 characters"}), 400
+    if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', slug):
+        return jsonify({"error": "Slug must contain only lowercase letters, numbers, and hyphens"}), 400
     if Menu.query.filter_by(slug=slug).first():
         return jsonify({"error": "Slug already exists"}), 400
     menu = Menu(
@@ -85,9 +91,14 @@ def create_menu():
 def update_menu(menu_id):
     menu = Menu.query.get_or_404(menu_id)
     data = request.get_json()
-    menu.name = data.get("name", menu.name).strip()
+    updated_name = data.get("name", menu.name).strip()
+    if not updated_name or len(updated_name) > 200:
+        return jsonify({"error": "Name must be 1-200 characters"}), 400
+    menu.name = updated_name
     new_slug = data.get("slug", menu.slug).strip()
     if new_slug != menu.slug:
+        if not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', new_slug):
+            return jsonify({"error": "Slug must contain only lowercase letters, numbers, and hyphens"}), 400
         if Menu.query.filter_by(slug=new_slug).first():
             return jsonify({"error": "Slug already exists"}), 400
         menu.slug = new_slug
@@ -131,6 +142,8 @@ def list_dishes():
     for dish in dishes:
         allergens = []
         for ma in dish.allergens:
+            if not ma.allergen:
+                continue
             allergens.append({
                 "id": ma.allergen.id,
                 "name": ma.allergen.name,
@@ -166,8 +179,14 @@ def add_dish():
     ingredients_text = data.get("ingredients", "")
     allergen_names = data.get("allergen_names")
 
-    if not name:
-        return jsonify({"error": "Name is required"}), 400
+    if not name or len(name) > 200:
+        return jsonify({"error": "Name must be 1-200 characters"}), 400
+    try:
+        price = float(price)
+    except (TypeError, ValueError):
+        return jsonify({"error": "Price must be a number"}), 400
+    if price < 0 or price > 9999:
+        return jsonify({"error": "Price must be between 0 and 9999"}), 400
 
     category = data.get("category", "Mains")
     is_special = data.get("is_special", False)
@@ -214,9 +233,19 @@ def edit_dish(dish_id):
     dish = MenuItem.query.get_or_404(dish_id)
     data = request.get_json()
 
-    dish.name = data.get("name", dish.name).strip()
+    updated_name = data.get("name", dish.name).strip()
+    if not updated_name or len(updated_name) > 200:
+        return jsonify({"error": "Name must be 1-200 characters"}), 400
+    try:
+        updated_price = float(data.get("price", dish.price))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Price must be a number"}), 400
+    if updated_price < 0 or updated_price > 9999:
+        return jsonify({"error": "Price must be between 0 and 9999"}), 400
+
+    dish.name = updated_name
     dish.description = data.get("description", dish.description).strip()
-    dish.price = float(data.get("price", dish.price))
+    dish.price = updated_price
     dish.category = data.get("category", dish.category)
     dish.is_special = data.get("is_special", dish.is_special)
     dish.image_url = data.get("image_url", dish.image_url)
@@ -394,17 +423,19 @@ def update_order_status(order_id):
 @login_required
 def list_pairings():
     pairings = Pairing.query.all()
-    return jsonify([
-        {
+    result = []
+    for p in pairings:
+        if not p.food_item or not p.drink_item:
+            continue
+        result.append({
             "id": p.id,
             "food_item_id": p.food_item_id,
-            "food_name": p.food_item.name if p.food_item else None,
+            "food_name": p.food_item.name,
             "drink_item_id": p.drink_item_id,
-            "drink_name": p.drink_item.name if p.drink_item else None,
+            "drink_name": p.drink_item.name,
             "note": p.note,
-        }
-        for p in pairings
-    ])
+        })
+    return jsonify(result)
 
 @admin_bp.route("/pairings", methods=["POST"])
 @login_required

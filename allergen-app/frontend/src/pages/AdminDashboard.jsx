@@ -15,6 +15,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderStatusFilter, setOrderStatusFilter] = useState("");
+  const [orderStatusError, setOrderStatusError] = useState("");
   const ordersInterval = useRef(null);
   const previousOrderCount = useRef(0);
   const navigate = useNavigate();
@@ -88,11 +89,16 @@ export default function AdminDashboard() {
   }, [activeTab, loadOrders]);
 
   async function handleUpdateOrderStatus(orderId, status) {
+    setOrderStatusError("");
     try {
-      await updateOrderStatus(orderId, status);
+      const result = await updateOrderStatus(orderId, status);
+      if (!result) {
+        setOrderStatusError(`Failed to update order #${orderId} status.`);
+        return;
+      }
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
     } catch {
-      // silently fail
+      setOrderStatusError(`Failed to update order #${orderId} status. Please try again.`);
     }
   }
 
@@ -446,7 +452,7 @@ export default function AdminDashboard() {
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex flex-wrap gap-1">
-                            {dish.allergens.map((a) => (
+                            {(dish.allergens || []).map((a) => (
                               <AllergenBadge key={a.id} allergen={a} small />
                             ))}
                           </div>
@@ -520,9 +526,9 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {dish.allergens.length > 0 && (
+                    {(dish.allergens || []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-3">
-                        {dish.allergens.map((a) => (
+                        {(dish.allergens || []).map((a) => (
                           <AllergenBadge key={a.id} allergen={a} small />
                         ))}
                       </div>
@@ -605,6 +611,20 @@ export default function AdminDashboard() {
               </button>
             </div>
 
+            {orderStatusError && (
+              <div className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm font-medium border border-red-100 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V7a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {orderStatusError}
+                <button onClick={() => setOrderStatusError("")} className="ml-auto text-red-400 hover:text-red-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
             {ordersLoading && orders.length === 0 ? (
               <div className="text-center py-16">
                 <div className="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
@@ -652,7 +672,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Order items */}
-                    {order.items && order.items.length > 0 && (
+                    {Array.isArray(order.items) && order.items.length > 0 && (
                       <div className="bg-stone-50 rounded-lg p-3 mb-3">
                         <div className="space-y-1.5">
                           {order.items.map((item, idx) => (

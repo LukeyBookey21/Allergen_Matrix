@@ -39,6 +39,8 @@ def get_menu():
     for dish in dishes:
         allergens = []
         for ma in dish.allergens:
+            if not ma.allergen:
+                continue
             allergens.append({
                 "id": ma.allergen.id,
                 "name": ma.allergen.name,
@@ -85,10 +87,21 @@ def create_order():
     notes = data.get("notes", "").strip()
     items = data.get("items", [])
 
-    if not table_number:
-        return jsonify({"error": "Table number is required"}), 400
-    if not items:
-        return jsonify({"error": "Order must have at least one item"}), 400
+    if not table_number or len(table_number) > 20:
+        return jsonify({"error": "Table number is required and must be 1-20 characters"}), 400
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "Order must have a non-empty list of items"}), 400
+
+    # Validate each item
+    for item in items:
+        menu_item_id = item.get("menu_item_id")
+        quantity = item.get("quantity", 1)
+        if not menu_item_id or not isinstance(menu_item_id, int):
+            return jsonify({"error": "Each item must have a valid menu_item_id"}), 400
+        if not isinstance(quantity, int) or quantity < 1 or quantity > 99:
+            return jsonify({"error": "Quantity must be an integer between 1 and 99"}), 400
+        if not MenuItem.query.get(menu_item_id):
+            return jsonify({"error": f"Menu item {menu_item_id} does not exist"}), 400
 
     order = Order(table_number=table_number, customer_name=customer_name, notes=notes)
     db.session.add(order)
@@ -98,20 +111,48 @@ def create_order():
         menu_item_id = item.get("menu_item_id")
         quantity = item.get("quantity", 1)
         item_notes = item.get("notes", "")
-        if menu_item_id:
-            oi = OrderItem(order_id=order.id, menu_item_id=menu_item_id, quantity=quantity, notes=item_notes)
-            db.session.add(oi)
+        oi = OrderItem(order_id=order.id, menu_item_id=menu_item_id, quantity=quantity, notes=item_notes)
+        db.session.add(oi)
 
     db.session.commit()
-    return jsonify({"id": order.id, "message": "Order placed", "status": "pending"}), 201
+
+    # Return full order data
+    order_items = []
+    total = 0.0
+    for oi in order.items:
+        item_price = oi.menu_item.price if oi.menu_item else 0
+        item_total = item_price * oi.quantity
+        total += item_total
+        order_items.append({
+            "id": oi.id,
+            "menu_item_id": oi.menu_item_id,
+            "name": oi.menu_item.name if oi.menu_item else "Unknown",
+            "price": item_price,
+            "quantity": oi.quantity,
+            "notes": oi.notes,
+        })
+
+    return jsonify({
+        "id": order.id,
+        "table_number": order.table_number,
+        "customer_name": order.customer_name,
+        "notes": order.notes,
+        "status": order.status,
+        "items": order_items,
+        "total": round(total, 2),
+        "message": "Order placed",
+    }), 201
 
 
 @public_bp.route("/pairings/<int:dish_id>", methods=["GET"])
 def get_pairings(dish_id):
     """Get drink pairings for a dish."""
     pairings = Pairing.query.filter_by(food_item_id=dish_id).all()
-    return jsonify([
-        {
+    result = []
+    for p in pairings:
+        if not p.drink_item:
+            continue
+        result.append({
             "id": p.id,
             "drink": {
                 "id": p.drink_item.id,
@@ -121,6 +162,5 @@ def get_pairings(dish_id):
                 "category": p.drink_item.category,
             },
             "note": p.note,
-        }
-        for p in pairings
-    ])
+        })
+    return jsonify(result)

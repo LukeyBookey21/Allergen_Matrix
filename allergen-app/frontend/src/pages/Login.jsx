@@ -13,12 +13,17 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setSubmitting(true);
-    const result = await login(email, password);
-    setSubmitting(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      navigate("/admin");
+    try {
+      const result = await login(email, password);
+      setSubmitting(false);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        navigate("/admin");
+      }
+    } catch {
+      setSubmitting(false);
+      setError("Network error. Please check your connection and try again.");
     }
   }
 

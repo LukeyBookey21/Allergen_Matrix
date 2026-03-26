@@ -65,6 +65,7 @@ export default function AddEditDish() {
   const [detectionResult, setDetectionResult] = useState(null);
   const [detecting, setDetecting] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -86,9 +87,9 @@ export default function AddEditDish() {
           setMenuSlug(dish.menu_slug || dish.menu_id || "");
           setIsSpecial(dish.is_special || false);
           setIngredients(
-            dish.ingredients.map((i) => i.raw_text).join("\n")
+            (dish.ingredients || []).map((i) => i.raw_text).join("\n")
           );
-          setSelectedAllergens(dish.allergens.map((a) => a.name));
+          setSelectedAllergens((dish.allergens || []).map((a) => a.name));
         }
       }
       setLoading(false);
@@ -119,6 +120,7 @@ export default function AddEditDish() {
   async function handleSave(e) {
     e.preventDefault();
     setSaving(true);
+    setSaveError("");
 
     const data = {
       name,
@@ -131,12 +133,24 @@ export default function AddEditDish() {
       allergen_names: selectedAllergens,
     };
 
-    if (isEdit) {
-      await updateDish(id, data);
-    } else {
-      await createDish(data);
+    try {
+      let result;
+      if (isEdit) {
+        result = await updateDish(id, data);
+      } else {
+        result = await createDish(data);
+      }
+      if (!result) {
+        setSaveError("Failed to save dish. Please try again.");
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+      navigate("/admin");
+    } catch {
+      setSaveError("Network error. Please try again.");
+      setSaving(false);
     }
-    navigate("/admin");
   }
 
   // Preview dish object
@@ -418,6 +432,16 @@ export default function AddEditDish() {
                 </div>
               )}
             </div>
+
+            {/* Save error */}
+            {saveError && (
+              <div className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm font-medium border border-red-100">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V7a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                {saveError}
+              </div>
+            )}
 
             {/* Action buttons - desktop */}
             <div className="hidden sm:flex gap-3 pb-6">

@@ -14,128 +14,231 @@ async function apiFetch(url, options = {}) {
 }
 
 export async function login(email, password) {
-  const res = await apiFetch("/admin/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
-  return res.json();
+  try {
+    const res = await apiFetch("/admin/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res) return { error: "Login failed" };
+    return await res.json();
+  } catch {
+    return { error: "Network error" };
+  }
 }
 
 export async function logout() {
-  await apiFetch("/admin/logout");
+  try {
+    await apiFetch("/admin/logout");
+  } catch {
+    // silently fail
+  }
 }
 
 export async function getMe() {
-  const res = await apiFetch("/admin/me");
-  return res?.ok ? res.json() : null;
+  try {
+    const res = await apiFetch("/admin/me");
+    return res?.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getAdminDishes() {
-  const res = await apiFetch("/admin/dishes");
-  return res?.json();
+  try {
+    const res = await apiFetch("/admin/dishes");
+    if (!res) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function getAdminMenus() {
-  const res = await apiFetch("/admin/menus");
-  return res?.json();
+  try {
+    const res = await apiFetch("/admin/menus");
+    if (!res) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function createDish(data) {
-  const res = await apiFetch("/admin/dishes", {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-  return res.json();
+  try {
+    const res = await apiFetch("/admin/dishes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function updateDish(id, data) {
-  const res = await apiFetch(`/admin/dishes/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(data),
-  });
-  return res.json();
+  try {
+    const res = await apiFetch(`/admin/dishes/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function deleteDish(id) {
-  const res = await apiFetch(`/admin/dishes/${id}`, { method: "DELETE" });
-  return res.json();
+  try {
+    const res = await apiFetch(`/admin/dishes/${id}`, { method: "DELETE" });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function toggleDish(id) {
-  const res = await apiFetch(`/admin/dishes/${id}/toggle`, { method: "PATCH" });
-  return res.json();
+  try {
+    const res = await apiFetch(`/admin/dishes/${id}/toggle`, { method: "PATCH" });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function toggleSpecial(id) {
-  const res = await apiFetch(`/admin/dishes/${id}/toggle-special`, { method: "PATCH" });
-  return res.json();
+  try {
+    const res = await apiFetch(`/admin/dishes/${id}/toggle-special`, { method: "PATCH" });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function detectAllergens(ingredients) {
-  const res = await apiFetch("/admin/detect-allergens", {
-    method: "POST",
-    body: JSON.stringify({ ingredients }),
-  });
-  return res.json();
+  try {
+    const res = await apiFetch("/admin/detect-allergens", {
+      method: "POST",
+      body: JSON.stringify({ ingredients }),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function overrideAllergens(id, allergenNames) {
-  const res = await apiFetch(`/admin/dishes/${id}/override-allergens`, {
-    method: "POST",
-    body: JSON.stringify({ allergen_names: allergenNames }),
-  });
-  return res.json();
+  try {
+    const res = await apiFetch(`/admin/dishes/${id}/override-allergens`, {
+      method: "POST",
+      body: JSON.stringify({ allergen_names: allergenNames }),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function getMenus() {
-  const res = await fetch("/api/menus");
-  return res.json();
+  try {
+    const res = await fetch("/api/menus");
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function getMenuBySlug(slug) {
-  const res = await fetch(`/api/menu?menu=${slug}`);
-  return res.json();
+  try {
+    const res = await fetch(`/api/menu?menu=${slug}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function getMenu() {
-  const res = await fetch("/api/menu");
-  return res.json();
+  try {
+    const res = await fetch("/api/menu");
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function getAllergens() {
-  const res = await fetch("/api/menu/allergens");
-  return res.json();
+  try {
+    const res = await fetch("/api/menu/allergens");
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchCategories() {
-  const res = await fetch("/api/menu/categories");
-  return res.json();
+  try {
+    const res = await fetch("/api/menu/categories");
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function submitOrder(orderData) {
-  const res = await fetch("/api/orders", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(orderData),
-  });
-  return res.json();
+  try {
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(orderData),
+    });
+    if (!res.ok) return { error: "Order failed" };
+    return await res.json();
+  } catch {
+    return { error: "Network error" };
+  }
 }
 
 export async function getPairings(dishId) {
-  const res = await fetch(`/api/pairings/${dishId}`);
-  return res.json();
+  try {
+    const res = await fetch(`/api/pairings/${dishId}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function getAdminOrders(status) {
-  const url = status ? `/admin/orders?status=${status}` : "/admin/orders";
-  const res = await apiFetch(url);
-  return res?.json();
+  try {
+    const url = status ? `/admin/orders?status=${status}` : "/admin/orders";
+    const res = await apiFetch(url);
+    if (!res) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
 }
 
 export async function updateOrderStatus(orderId, status) {
-  const res = await apiFetch(`/admin/orders/${orderId}/status`, {
-    method: "PATCH",
-    body: JSON.stringify({ status }),
-  });
-  return res.json();
+  try {
+    const res = await apiFetch(`/admin/orders/${orderId}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }

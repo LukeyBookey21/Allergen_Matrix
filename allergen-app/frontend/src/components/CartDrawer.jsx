@@ -5,18 +5,22 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
   const [customerName, setCustomerName] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   const subtotal = items.reduce((sum, item) => sum + Number(item.dish.price) * item.quantity, 0);
   const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
 
   async function handlePlaceOrder() {
     if (!tableNumber.trim()) return;
+    setError("");
     setSubmitting(true);
     try {
       await onCheckout(tableNumber.trim(), customerName.trim(), orderNotes.trim());
       setTableNumber("");
       setCustomerName("");
       setOrderNotes("");
+    } catch (err) {
+      setError(err?.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -87,6 +91,7 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
                     <div className="flex items-center gap-1.5">
                       <button
                         onClick={() => onUpdateQuantity(item.dish.id, item.quantity - 1)}
+                        aria-label={`Decrease quantity of ${item.dish.name}`}
                         className="w-7 h-7 rounded-full bg-white border border-stone-200 flex items-center justify-center text-slate-500 hover:bg-stone-100 transition-colors text-sm font-medium"
                       >
                         -
@@ -94,6 +99,7 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
                       <span className="w-6 text-center text-sm font-semibold text-slate-700">{item.quantity}</span>
                       <button
                         onClick={() => onUpdateQuantity(item.dish.id, item.quantity + 1)}
+                        aria-label={`Increase quantity of ${item.dish.name}`}
                         className="w-7 h-7 rounded-full bg-white border border-stone-200 flex items-center justify-center text-slate-500 hover:bg-stone-100 transition-colors text-sm font-medium"
                       >
                         +
@@ -129,7 +135,7 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
             {/* Subtotal */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium text-slate-500">Subtotal</span>
-              <span className="text-lg font-bold text-slate-800">{subtotal.toFixed(2)}</span>
+              <span className="text-lg font-bold text-slate-800">£{subtotal.toFixed(2)}</span>
             </div>
 
             {/* Order notes */}
@@ -165,6 +171,13 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
               </div>
             </div>
 
+            {/* Error message */}
+            {error && (
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                {error}
+              </div>
+            )}
+
             {/* Place Order button */}
             <button
               onClick={handlePlaceOrder}
@@ -181,7 +194,7 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
                   Placing order...
                 </span>
               ) : (
-                `Place Order - ${subtotal.toFixed(2)}`
+                `Place Order - £${subtotal.toFixed(2)}`
               )}
             </button>
           </div>

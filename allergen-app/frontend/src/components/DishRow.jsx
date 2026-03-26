@@ -34,7 +34,7 @@ export default function DishRow({ dish, selectedAllergens = [], mode = "warn", h
             <>
               <span className="menu-row-dots" />
               <span className="text-amber-700 font-semibold tabular-nums flex-shrink-0">
-                {Number(dish.price).toFixed(2)}
+                £{Number(dish.price).toFixed(2)}
               </span>
             </>
           )}
@@ -45,7 +45,10 @@ export default function DishRow({ dish, selectedAllergens = [], mode = "warn", h
               className="relative flex-shrink-0 cursor-default ml-1"
               onMouseEnter={() => setShowPairingTip(true)}
               onMouseLeave={() => setShowPairingTip(false)}
+              onFocus={() => setShowPairingTip(true)}
+              onBlur={() => setShowPairingTip(false)}
               onTouchStart={() => setShowPairingTip((v) => !v)}
+              tabIndex={0}
             >
               <span className="text-xs opacity-40 hover:opacity-70 transition-opacity">🍷</span>
               {showPairingTip && (

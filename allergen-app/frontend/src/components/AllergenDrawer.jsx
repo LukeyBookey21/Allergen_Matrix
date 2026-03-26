@@ -27,6 +27,8 @@ export default function AllergenDrawer({ open, onClose, allergens, selected, onT
       {/* Drawer */}
       <div
         ref={drawerRef}
+        role="dialog"
+        aria-label="Allergen filter"
         className="absolute right-0 top-0 bottom-0 w-full max-w-sm bg-white shadow-2xl animate-slide-in-right flex flex-col"
       >
         {/* Header */}
@@ -63,6 +65,7 @@ export default function AllergenDrawer({ open, onClose, allergens, selected, onT
                 <button
                   key={allergen.id}
                   onClick={() => onToggle(allergen.name)}
+                  aria-label={`${isSelected ? "Remove" : "Add"} ${allergen.name} allergen filter`}
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200
                     ${
                       isSelected

@@ -64,6 +64,7 @@ def ai_detect(ingredient: str, api_key: str) -> tuple[list[str], bool]:
         message = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=200,
+            timeout=10.0,
             messages=[
                 {
                     "role": "user",

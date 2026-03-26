@@ -25,6 +25,7 @@ class Menu(db.Model):
 
 class MenuItem(db.Model):
     __tablename__ = "menu_item"
+    __table_args__ = (db.CheckConstraint('price >= 0', name='ck_menu_item_price'),)
     id = db.Column(db.Integer, primary_key=True)
     menu_id = db.Column(db.Integer, db.ForeignKey("menu.id"), nullable=True)
     name = db.Column(db.String(200), nullable=False)
@@ -55,6 +56,7 @@ class Allergen(db.Model):
 
 class MenuItemAllergen(db.Model):
     __tablename__ = "menu_item_allergen"
+    __table_args__ = (db.UniqueConstraint('menu_item_id', 'allergen_id', name='uq_menu_item_allergen'),)
     id = db.Column(db.Integer, primary_key=True)
     menu_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=False)
     allergen_id = db.Column(db.Integer, db.ForeignKey("allergen.id"), nullable=False)
@@ -76,6 +78,7 @@ class Order(db.Model):
 
 class OrderItem(db.Model):
     __tablename__ = "order_item"
+    __table_args__ = (db.CheckConstraint('quantity >= 1', name='ck_order_item_quantity'),)
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("order.id"), nullable=False)
     menu_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=False)

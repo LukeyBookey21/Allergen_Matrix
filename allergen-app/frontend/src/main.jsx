@@ -7,6 +7,18 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AddEditDish from "./pages/AddEditDish";
 import Login from "./pages/Login";
 
+function NotFound() {
+  return (
+    <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+      <div className="text-center">
+        <h1 className="font-display text-6xl font-bold text-slate-300 mb-4">404</h1>
+        <p className="text-slate-500 mb-4">Page not found</p>
+        <a href="/menu" className="text-amber-600 font-medium hover:text-amber-700">Back to menu</a>
+      </div>
+    </div>
+  );
+}
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <BrowserRouter>
@@ -18,6 +30,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/dishes/new" element={<AddEditDish />} />
         <Route path="/admin/dishes/:id/edit" element={<AddEditDish />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>

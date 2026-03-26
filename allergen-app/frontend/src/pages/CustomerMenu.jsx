@@ -35,25 +35,36 @@ export default function CustomerMenu() {
   const [cartOpen, setCartOpen] = useState(false);
   const [orderPlaced, setOrderPlaced] = useState(null);
   const [pairingsMap, setPairingsMap] = useState({});
+  const [error, setError] = useState(null);
 
   // Load menus list and allergens on mount
   useEffect(() => {
     async function init() {
-      const [menuList, allergenData] = await Promise.all([
-        getMenus().catch(() => []),
-        getAllergens().catch(() => []),
-      ]);
-      setMenus(menuList || []);
-      setAllergens(allergenData || []);
+      try {
+        const [menuList, allergenData] = await Promise.all([
+          getMenus().catch(() => []),
+          getAllergens().catch(() => []),
+        ]);
+        setMenus(menuList || []);
+        setAllergens(allergenData || []);
 
-      // Pick initial menu
-      const targetSlug = menuSlug || (menuList && menuList.length > 0 ? menuList[0].slug : null);
-      if (targetSlug) {
-        const menuData = await getMenuBySlug(targetSlug).catch(() => ({ dishes: [] }));
-        setActiveMenu(menuList.find((m) => m.slug === targetSlug) || { slug: targetSlug, name: targetSlug });
-        const loadedDishes = menuData.dishes || menuData || [];
-        setDishes(loadedDishes);
-        fetchPairings(loadedDishes);
+        // Pick initial menu
+        const targetSlug = menuSlug || (menuList && menuList.length > 0 ? menuList[0].slug : null);
+        if (targetSlug) {
+          const menuData = await getMenuBySlug(targetSlug).catch(() => ({ dishes: [] }));
+          if (!menuData) {
+            setError("Failed to load menu. Please try again.");
+            setLoading(false);
+            return;
+          }
+          setActiveMenu(menuList.find((m) => m.slug === targetSlug) || { slug: targetSlug, name: targetSlug });
+          const loadedDishes = menuData.dishes || menuData || [];
+          setDishes(loadedDishes);
+          fetchPairings(loadedDishes);
+        }
+        setError(null);
+      } catch {
+        setError("Failed to load menu. Please try again.");
       }
       setLoading(false);
     }
@@ -139,8 +150,11 @@ export default function CustomerMenu() {
       })),
     };
     const result = await submitOrder(orderData);
+    if (result.error) {
+      throw new Error(result.error);
+    }
     if (result.id) {
-      setOrderPlaced(result);
+      setOrderPlaced({ ...result, tableNumber, items: cart });
       setCart([]);
       setCartOpen(false);
     }
@@ -187,6 +201,28 @@ export default function CustomerMenu() {
         <div className="text-center">
           <div className="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
           <p className="text-slate-400 text-sm font-medium tracking-wide">Loading menu...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-amber-50/30 flex items-center justify-center">
+        <div className="text-center px-4">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h2 className="font-display text-xl font-bold text-slate-800 mb-2">Something went wrong</h2>
+          <p className="text-slate-500 text-sm mb-4">{error}</p>
+          <button
+            onClick={() => { setError(null); setLoading(true); window.location.reload(); }}
+            className="bg-amber-500 text-white px-6 py-2.5 rounded-xl font-semibold text-sm hover:bg-amber-600 transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -289,7 +325,7 @@ export default function CustomerMenu() {
           <div className="text-center mb-8">
             <p className="text-sm text-slate-500 font-medium">
               <span className="text-amber-700 font-display text-lg font-semibold">
-                {Number(activeMenu.price_per_person).toFixed(2)}
+                £{Number(activeMenu.price_per_person).toFixed(2)}
               </span>{" "}
               per person
             </p>
@@ -417,6 +453,23 @@ export default function CustomerMenu() {
             </div>
             <h2 className="text-xl font-bold text-slate-800 mb-2">Order Placed!</h2>
             <p className="text-slate-500 text-sm mb-1">Order #{orderPlaced.id}</p>
+            {orderPlaced.tableNumber && (
+              <p className="text-slate-500 text-sm mb-1">Table {orderPlaced.tableNumber}</p>
+            )}
+            {orderPlaced.items && orderPlaced.items.length > 0 && (
+              <div className="text-left bg-stone-50 rounded-lg p-3 mb-3 mt-3">
+                {orderPlaced.items.map((item) => (
+                  <div key={item.dish.id} className="flex justify-between text-sm py-0.5">
+                    <span className="text-slate-600">{item.quantity}x {item.dish.name}</span>
+                    <span className="text-slate-500">£{(Number(item.dish.price) * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+                <div className="border-t border-stone-200 mt-2 pt-2 flex justify-between font-semibold text-sm">
+                  <span className="text-slate-700">Total</span>
+                  <span className="text-slate-800">£{orderPlaced.items.reduce((sum, item) => sum + Number(item.dish.price) * item.quantity, 0).toFixed(2)}</span>
+                </div>
+              </div>
+            )}
             <p className="text-slate-500 text-sm mb-4">Your server will be with you shortly.</p>
             <button
               onClick={() => setOrderPlaced(null)}
