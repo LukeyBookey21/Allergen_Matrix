@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from models import MenuItem, Allergen, Menu
 
-public_bp = Blueprint("public", __name__)
+public_bp = Blueprint("public", __name__, url_prefix="/api")
 
 
 @public_bp.route("/menus", methods=["GET"])

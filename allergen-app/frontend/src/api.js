@@ -88,26 +88,26 @@ export async function overrideAllergens(id, allergenNames) {
 }
 
 export async function getMenus() {
-  const res = await fetch("/menus");
+  const res = await fetch("/api/menus");
   return res.json();
 }
 
 export async function getMenuBySlug(slug) {
-  const res = await fetch(`/menu?menu=${slug}`);
+  const res = await fetch(`/api/menu?menu=${slug}`);
   return res.json();
 }
 
 export async function getMenu() {
-  const res = await fetch("/menu");
+  const res = await fetch("/api/menu");
   return res.json();
 }
 
 export async function getAllergens() {
-  const res = await fetch("/menu/allergens");
+  const res = await fetch("/api/menu/allergens");
   return res.json();
 }
 
 export async function fetchCategories() {
-  const res = await fetch("/menu/categories");
+  const res = await fetch("/api/menu/categories");
   return res.json();
 }
