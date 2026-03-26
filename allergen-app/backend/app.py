@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash
 
 from config import Config
 from models import db, AdminUser, seed_allergens
+from seed_data import seed_dishes
 from routes.admin import admin_bp
 from routes.public import public_bp
 
@@ -52,6 +53,7 @@ def create_app():
     with app.app_context():
         db.create_all()
         seed_allergens()
+        seed_dishes()
 
         # Create admin user if not exists
         admin_email = app.config["ADMIN_EMAIL"]
