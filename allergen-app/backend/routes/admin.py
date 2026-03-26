@@ -7,7 +7,7 @@ import io
 import qrcode
 from flask import send_file
 
-from models import db, AdminUser, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Order, OrderItem, Pairing
+from models import db, AdminUser, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Order, OrderItem, Pairing, DishOption, PreOrder, PreOrderGuest, PreOrderItem
 from parser import parse_and_detect
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -479,3 +479,290 @@ def generate_qr():
     buf.seek(0)
 
     return send_file(buf, mimetype="image/png", download_name="menu-qr-code.png")
+
+
+# ── Pre-Orders ──────────────────────────────────────────
+
+@admin_bp.route("/pre-orders", methods=["GET"])
+@login_required
+def list_pre_orders():
+    orders = PreOrder.query.order_by(PreOrder.booking_date.desc(), PreOrder.booking_time.desc()).all()
+    return jsonify([_serialize_pre_order_summary(po) for po in orders])
+
+def _serialize_pre_order_summary(po):
+    return {
+        "id": po.id,
+        "reference": po.reference,
+        "contact_name": po.contact_name,
+        "email": po.email,
+        "party_size": po.party_size,
+        "booking_date": po.booking_date,
+        "booking_time": po.booking_time,
+        "status": po.status,
+        "payment_status": po.payment_status,
+        "created_at": po.created_at.isoformat() if po.created_at else None,
+    }
+
+@admin_bp.route("/pre-orders/<int:po_id>", methods=["GET"])
+@login_required
+def get_pre_order_detail(po_id):
+    po = PreOrder.query.get_or_404(po_id)
+    # Reuse the public serializer from public routes
+    from routes.public import _serialize_pre_order
+    return jsonify(_serialize_pre_order(po))
+
+@admin_bp.route("/pre-orders/<int:po_id>/status", methods=["PATCH"])
+@login_required
+def update_pre_order_status(po_id):
+    po = PreOrder.query.get_or_404(po_id)
+    data = request.get_json()
+    new_status = data.get("status", "").strip()
+    valid = ["pending", "confirmed", "amended", "cancelled"]
+    if new_status not in valid:
+        return jsonify({"error": f"Invalid status"}), 400
+    po.status = new_status
+    db.session.commit()
+    return jsonify({"status": po.status})
+
+@admin_bp.route("/pre-orders/<int:po_id>/kitchen-sheet", methods=["GET"])
+@login_required
+def download_kitchen_sheet(po_id):
+    """Generate CSV kitchen sheet for a pre-order."""
+    import csv
+    import json as json_mod
+    po = PreOrder.query.get_or_404(po_id)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Guest", "Seat", "Allergies", "Starter", "Main", "Main Options", "Dessert", "Notes"])
+
+    for guest in po.guests:
+        starter = ""
+        main = ""
+        main_options = ""
+        dessert = ""
+        notes_parts = []
+
+        for item in guest.items:
+            if item.skipped:
+                dish_text = "— None —"
+            elif item.menu_item:
+                dish_text = item.menu_item.name
+            else:
+                dish_text = "Unknown"
+
+            customisations = {}
+            try:
+                customisations = json_mod.loads(item.customisations) if item.customisations else {}
+            except:
+                pass
+
+            custom_str = ", ".join(f"{v}" for k, v in customisations.items() if v and v != "None")
+
+            if item.course == "starter":
+                starter = dish_text
+            elif item.course == "main":
+                main = dish_text
+                main_options = custom_str
+            elif item.course == "dessert":
+                dessert = dish_text
+
+            if item.notes:
+                notes_parts.append(item.notes)
+
+        writer.writerow([
+            guest.guest_name,
+            guest.position,
+            guest.allergen_names or "None",
+            starter,
+            main,
+            main_options,
+            dessert,
+            "; ".join(notes_parts),
+        ])
+
+    # Summary row
+    writer.writerow([])
+    writer.writerow(["SUMMARY"])
+    # Count dishes
+    from collections import Counter
+    dish_counts = Counter()
+    for guest in po.guests:
+        for item in guest.items:
+            if not item.skipped and item.menu_item:
+                customisations = {}
+                try:
+                    customisations = json_mod.loads(item.customisations) if item.customisations else {}
+                except:
+                    pass
+                custom_str = ", ".join(f"{v}" for k, v in customisations.items() if v and v != "None")
+                label = item.menu_item.name
+                if custom_str:
+                    label += f" ({custom_str})"
+                dish_counts[label] += 1
+    for dish, count in dish_counts.most_common():
+        writer.writerow([f"{count}x", dish])
+
+    output.seek(0)
+    return send_file(
+        io.BytesIO(output.getvalue().encode("utf-8")),
+        mimetype="text/csv",
+        download_name=f"kitchen-sheet-{po.reference}.csv",
+    )
+
+
+@admin_bp.route("/pre-orders/<int:po_id>/placecards", methods=["GET"])
+@login_required
+def download_placecards(po_id):
+    """Generate printable HTML placecards."""
+    import json as json_mod
+    po = PreOrder.query.get_or_404(po_id)
+
+    cards_html = []
+    for guest in po.guests:
+        courses_html = ""
+        for item in guest.items:
+            if item.skipped:
+                continue
+            if not item.menu_item:
+                continue
+
+            customisations = {}
+            try:
+                customisations = json_mod.loads(item.customisations) if item.customisations else {}
+            except:
+                pass
+
+            custom_parts = [v for k, v in customisations.items() if v and v != "None"]
+
+            course_label = item.course.title()
+            dish_name = item.menu_item.name
+            courses_html += f'<div class="course"><span class="course-label">{course_label}</span>'
+            courses_html += f'<span class="dish-name">{dish_name}</span>'
+            if custom_parts:
+                courses_html += f'<span class="options">{", ".join(custom_parts)}</span>'
+            courses_html += '</div>'
+
+        allergens = guest.allergen_names if guest.allergen_names else "No allergies noted"
+
+        cards_html.append(f'''
+        <div class="card">
+            <div class="guest-name">{guest.guest_name}</div>
+            <div class="courses">{courses_html}</div>
+            <div class="allergens">⚠ {allergens}</div>
+        </div>
+        ''')
+
+    html = f'''<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Place Cards - {po.reference}</title>
+<style>
+    @media print {{ @page {{ size: A4; margin: 10mm; }} }}
+    body {{ font-family: Georgia, serif; margin: 0; padding: 20px; background: #fff; }}
+    .cards {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
+    .card {{
+        border: 2px solid #1e293b;
+        border-radius: 12px;
+        padding: 24px;
+        page-break-inside: avoid;
+        min-height: 200px;
+    }}
+    .guest-name {{
+        font-size: 22px;
+        font-weight: bold;
+        color: #1e293b;
+        border-bottom: 2px solid #d97706;
+        padding-bottom: 8px;
+        margin-bottom: 16px;
+    }}
+    .course {{
+        margin-bottom: 8px;
+    }}
+    .course-label {{
+        display: block;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #94a3b8;
+        margin-bottom: 2px;
+    }}
+    .dish-name {{
+        display: block;
+        font-size: 14px;
+        color: #1e293b;
+        font-weight: 600;
+    }}
+    .options {{
+        display: block;
+        font-size: 12px;
+        color: #64748b;
+        font-style: italic;
+    }}
+    .allergens {{
+        margin-top: 16px;
+        padding-top: 8px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 11px;
+        color: #ef4444;
+    }}
+    h1 {{
+        font-size: 18px;
+        color: #64748b;
+        margin-bottom: 20px;
+    }}
+</style>
+</head>
+<body>
+<h1>Place Cards — {po.reference} — {po.booking_date} at {po.booking_time}</h1>
+<div class="cards">{"".join(cards_html)}</div>
+</body>
+</html>'''
+
+    return send_file(
+        io.BytesIO(html.encode("utf-8")),
+        mimetype="text/html",
+        download_name=f"placecards-{po.reference}.html",
+    )
+
+
+# ── Dish Options ──────────────────────────────────────────
+
+@admin_bp.route("/dish-options", methods=["GET"])
+@login_required
+def list_dish_options():
+    options = DishOption.query.all()
+    return jsonify([{
+        "id": o.id,
+        "menu_item_id": o.menu_item_id,
+        "dish_name": o.menu_item.name if o.menu_item else None,
+        "option_group": o.option_group,
+        "option_name": o.option_name,
+        "price_modifier": o.price_modifier,
+        "is_required": o.is_required,
+    } for o in options])
+
+@admin_bp.route("/dish-options", methods=["POST"])
+@login_required
+def create_dish_option():
+    data = request.get_json()
+    opt = DishOption(
+        menu_item_id=data.get("menu_item_id"),
+        option_group=data.get("option_group", ""),
+        option_name=data.get("option_name", ""),
+        price_modifier=data.get("price_modifier", 0),
+        is_required=data.get("is_required", False),
+        display_order=data.get("display_order", 0),
+    )
+    db.session.add(opt)
+    db.session.commit()
+    return jsonify({"id": opt.id}), 201
+
+@admin_bp.route("/dish-options/<int:opt_id>", methods=["DELETE"])
+@login_required
+def delete_dish_option(opt_id):
+    opt = DishOption.query.get_or_404(opt_id)
+    db.session.delete(opt)
+    db.session.commit()
+    return jsonify({"message": "Deleted"})

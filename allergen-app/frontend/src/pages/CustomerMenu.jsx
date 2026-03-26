@@ -477,12 +477,18 @@ export default function CustomerMenu() {
             Whilst we take every care, we cannot guarantee that any dish is
             completely free from allergens.
           </p>
-          <Link
-            to="/admin/login"
-            className="text-[11px] text-slate-300 hover:text-slate-500 transition-colors font-medium"
-          >
-            Staff login
-          </Link>
+          <div className="flex items-center justify-center gap-4">
+            <Link to="/pre-order" className="text-sm text-amber-600 hover:text-amber-700 font-medium transition-colors">
+              Group dining? Pre-order for 8+
+            </Link>
+            <span className="text-slate-300">|</span>
+            <Link
+              to="/admin/login"
+              className="text-[11px] text-slate-300 hover:text-slate-500 transition-colors font-medium"
+            >
+              Staff login
+            </Link>
+          </div>
         </div>
       </footer>
 

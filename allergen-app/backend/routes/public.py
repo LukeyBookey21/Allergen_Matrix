@@ -1,5 +1,9 @@
+import json
+import string
+import random
+
 from flask import Blueprint, jsonify, request
-from models import db, MenuItem, Allergen, Menu, Order, OrderItem, Pairing
+from models import db, MenuItem, Allergen, Menu, Order, OrderItem, Pairing, DishOption, PreOrder, PreOrderGuest, PreOrderItem
 
 public_bp = Blueprint("public", __name__, url_prefix="/api")
 
@@ -191,3 +195,159 @@ def get_pairings(dish_id):
             "note": p.note,
         })
     return jsonify(result)
+
+
+@public_bp.route("/dish-options/<int:dish_id>", methods=["GET"])
+def get_dish_options(dish_id):
+    """Get customisation options for a dish."""
+    options = DishOption.query.filter_by(menu_item_id=dish_id).order_by(DishOption.display_order).all()
+    grouped = {}
+    for opt in options:
+        if opt.option_group not in grouped:
+            grouped[opt.option_group] = {"group": opt.option_group, "is_required": opt.is_required, "options": []}
+        grouped[opt.option_group]["options"].append({
+            "id": opt.id,
+            "name": opt.option_name,
+            "price_modifier": opt.price_modifier,
+        })
+    return jsonify(list(grouped.values()))
+
+
+def _generate_reference():
+    """Generate a unique pre-order reference like PO-A3K9."""
+    while True:
+        ref = "PO-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        if not PreOrder.query.filter_by(reference=ref).first():
+            return ref
+
+
+@public_bp.route("/pre-orders", methods=["POST"])
+def create_pre_order():
+    """Customer submits a group pre-order."""
+    data = request.get_json()
+
+    contact_name = data.get("contact_name", "").strip()
+    email = data.get("email", "").strip()
+    phone = data.get("phone", "").strip()
+    party_size = data.get("party_size", 0)
+    booking_date = data.get("booking_date", "").strip()
+    booking_time = data.get("booking_time", "").strip()
+    special_notes = data.get("special_notes", "").strip()
+    guests = data.get("guests", [])
+
+    # Validation
+    if not contact_name or not email or not booking_date or not booking_time:
+        return jsonify({"error": "Contact name, email, date and time are required"}), 400
+    if not isinstance(party_size, int) or party_size < 8 or party_size > 50:
+        return jsonify({"error": "Party size must be between 8 and 50"}), 400
+    if not isinstance(guests, list) or len(guests) == 0:
+        return jsonify({"error": "Guest orders are required"}), 400
+    if len(guests) != party_size:
+        return jsonify({"error": f"Expected {party_size} guests but got {len(guests)}"}), 400
+
+    reference = _generate_reference()
+
+    pre_order = PreOrder(
+        reference=reference,
+        contact_name=contact_name,
+        email=email,
+        phone=phone,
+        party_size=party_size,
+        booking_date=booking_date,
+        booking_time=booking_time,
+        special_notes=special_notes,
+    )
+    db.session.add(pre_order)
+    db.session.flush()
+
+    for i, guest_data in enumerate(guests):
+        guest = PreOrderGuest(
+            pre_order_id=pre_order.id,
+            guest_name=guest_data.get("name", f"Guest {i+1}").strip(),
+            position=i + 1,
+            dietary_notes=guest_data.get("dietary_notes", ""),
+            allergen_names=",".join(guest_data.get("allergens", [])),
+        )
+        db.session.add(guest)
+        db.session.flush()
+
+        for course_data in guest_data.get("courses", []):
+            item = PreOrderItem(
+                guest_id=guest.id,
+                menu_item_id=course_data.get("menu_item_id"),
+                course=course_data.get("course", ""),
+                skipped=course_data.get("skipped", False),
+                customisations=json.dumps(course_data.get("customisations", {})),
+                notes=course_data.get("notes", ""),
+            )
+            db.session.add(item)
+
+    db.session.commit()
+
+    return jsonify({
+        "id": pre_order.id,
+        "reference": reference,
+        "message": "Pre-order submitted",
+        "status": "pending",
+    }), 201
+
+
+@public_bp.route("/pre-orders/<ref>", methods=["GET"])
+def get_pre_order(ref):
+    """Get pre-order details by reference."""
+    po = PreOrder.query.filter_by(reference=ref.upper()).first_or_404()
+    return jsonify(_serialize_pre_order(po))
+
+
+def _serialize_pre_order(po):
+    """Serialize a pre-order to JSON."""
+    guests = []
+    total = 0.0
+    for guest in po.guests:
+        courses = []
+        for item in guest.items:
+            customisations = {}
+            try:
+                customisations = json.loads(item.customisations) if item.customisations else {}
+            except:
+                pass
+            item_price = 0
+            item_name = "Skipped"
+            if not item.skipped and item.menu_item:
+                item_price = item.menu_item.price
+                item_name = item.menu_item.name
+                # Add price modifiers from customisations
+                # (simplified — just track base price for now)
+            total += item_price
+            courses.append({
+                "course": item.course,
+                "skipped": item.skipped,
+                "dish_name": item_name,
+                "dish_id": item.menu_item_id,
+                "price": item_price,
+                "customisations": customisations,
+                "notes": item.notes,
+            })
+        guests.append({
+            "name": guest.guest_name,
+            "position": guest.position,
+            "allergens": guest.allergen_names.split(",") if guest.allergen_names else [],
+            "dietary_notes": guest.dietary_notes,
+            "courses": courses,
+        })
+    return {
+        "id": po.id,
+        "reference": po.reference,
+        "contact_name": po.contact_name,
+        "email": po.email,
+        "phone": po.phone,
+        "party_size": po.party_size,
+        "booking_date": po.booking_date,
+        "booking_time": po.booking_time,
+        "special_notes": po.special_notes,
+        "status": po.status,
+        "payment_status": po.payment_status,
+        "total": round(total, 2),
+        "guests": guests,
+        "created_at": po.created_at.isoformat() if po.created_at else None,
+    }

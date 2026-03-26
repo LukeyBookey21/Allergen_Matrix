@@ -242,3 +242,61 @@ export async function updateOrderStatus(orderId, status) {
     return null;
   }
 }
+
+export async function getDishOptions(dishId) {
+  try {
+    const res = await fetch(`/api/dish-options/${dishId}`);
+    if (!res.ok) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
+export async function submitPreOrder(data) {
+  try {
+    const res = await fetch("/api/pre-orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { error: err.error || "Failed to submit pre-order" };
+    }
+    return await res.json();
+  } catch { return { error: "Network error" }; }
+}
+
+export async function getPreOrderStatus(ref) {
+  try {
+    const res = await fetch(`/api/pre-orders/${ref}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+export async function getAdminPreOrders() {
+  try {
+    const res = await apiFetch("/admin/pre-orders");
+    if (!res) return [];
+    return await res.json();
+  } catch { return []; }
+}
+
+export async function getAdminPreOrderDetail(id) {
+  try {
+    const res = await apiFetch(`/admin/pre-orders/${id}`);
+    if (!res) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+export async function updatePreOrderStatus(id, status) {
+  try {
+    const res = await apiFetch(`/admin/pre-orders/${id}/status`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch { return null; }
+}

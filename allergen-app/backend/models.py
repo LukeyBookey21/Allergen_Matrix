@@ -98,6 +98,59 @@ class Pairing(db.Model):
     drink_item = db.relationship("MenuItem", foreign_keys=[drink_item_id])
 
 
+class DishOption(db.Model):
+    __tablename__ = "dish_option"
+    id = db.Column(db.Integer, primary_key=True)
+    menu_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=False)
+    option_group = db.Column(db.String(50), nullable=False)  # "Cooking", "Sauce", "Side", "Protein", "Extras"
+    option_name = db.Column(db.String(100), nullable=False)  # "Medium Rare", "Peppercorn", "Chips"
+    price_modifier = db.Column(db.Float, default=0.0)
+    is_required = db.Column(db.Boolean, default=False)  # False = optional, user can skip
+    display_order = db.Column(db.Integer, default=0)
+    menu_item = db.relationship("MenuItem", backref="options")
+
+
+class PreOrder(db.Model):
+    __tablename__ = "pre_order"
+    id = db.Column(db.Integer, primary_key=True)
+    reference = db.Column(db.String(20), unique=True, nullable=False)  # e.g. "PO-A3K9"
+    contact_name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(200), nullable=False)
+    phone = db.Column(db.String(30), default="")
+    party_size = db.Column(db.Integer, nullable=False)
+    booking_date = db.Column(db.String(20), nullable=False)  # "2026-04-15"
+    booking_time = db.Column(db.String(10), nullable=False)  # "19:00"
+    special_notes = db.Column(db.Text, default="")
+    status = db.Column(db.String(30), default="pending")  # pending, confirmed, amended, cancelled
+    payment_status = db.Column(db.String(30), default="unpaid")  # unpaid, deposit, paid
+    created_at = db.Column(db.DateTime, default=db.func.now())
+    updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
+    guests = db.relationship("PreOrderGuest", backref="pre_order", cascade="all, delete-orphan", order_by="PreOrderGuest.position")
+
+
+class PreOrderGuest(db.Model):
+    __tablename__ = "pre_order_guest"
+    id = db.Column(db.Integer, primary_key=True)
+    pre_order_id = db.Column(db.Integer, db.ForeignKey("pre_order.id"), nullable=False)
+    guest_name = db.Column(db.String(100), nullable=False)
+    position = db.Column(db.Integer, default=1)  # seat number
+    dietary_notes = db.Column(db.String(200), default="")
+    allergen_names = db.Column(db.String(500), default="")  # comma-separated: "Gluten,Milk"
+    items = db.relationship("PreOrderItem", backref="guest", cascade="all, delete-orphan")
+
+
+class PreOrderItem(db.Model):
+    __tablename__ = "pre_order_item"
+    id = db.Column(db.Integer, primary_key=True)
+    guest_id = db.Column(db.Integer, db.ForeignKey("pre_order_guest.id"), nullable=False)
+    menu_item_id = db.Column(db.Integer, db.ForeignKey("menu_item.id"), nullable=True)  # null = skipped course
+    course = db.Column(db.String(20), nullable=False)  # "starter", "main", "dessert", "drink"
+    skipped = db.Column(db.Boolean, default=False)
+    customisations = db.Column(db.Text, default="{}")  # JSON: {"cooking": "Medium Rare", "sauce": "Peppercorn"}
+    notes = db.Column(db.String(300), default="")
+    menu_item = db.relationship("MenuItem")
+
+
 SEED_ALLERGENS = [
     ("Celery", "\U0001f33f"),
     ("Gluten", "\U0001f33e"),

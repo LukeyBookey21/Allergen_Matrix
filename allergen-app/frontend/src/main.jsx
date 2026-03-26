@@ -6,6 +6,7 @@ import CustomerMenu from "./pages/CustomerMenu";
 import AdminDashboard from "./pages/AdminDashboard";
 import AddEditDish from "./pages/AddEditDish";
 import Login from "./pages/Login";
+import PreOrder from "./pages/PreOrder";
 
 function NotFound() {
   return (
@@ -30,6 +31,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/dishes/new" element={<AddEditDish />} />
         <Route path="/admin/dishes/:id/edit" element={<AddEditDish />} />
+        <Route path="/pre-order" element={<PreOrder />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

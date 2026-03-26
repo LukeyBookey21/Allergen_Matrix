@@ -1,5 +1,5 @@
 """Seed the database with full restaurant menu dishes across all menus."""
-from models import db, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Pairing
+from models import db, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Pairing, DishOption
 from parser import parse_and_detect
 
 
@@ -736,6 +736,62 @@ def seed_dishes():
 
     db.session.commit()
     seed_pairings()
+    seed_dish_options()
+
+
+SEED_DISH_OPTIONS = [
+    # Steak
+    {"dish": "8oz Sirloin Steak", "group": "Cooking", "options": [
+        ("None / Chef's choice", 0), ("Rare", 0), ("Medium Rare", 0), ("Medium", 0), ("Medium Well", 0), ("Well Done", 0)
+    ]},
+    {"dish": "8oz Sirloin Steak", "group": "Sauce", "options": [
+        ("None", 0), ("Peppercorn", 0), ("Béarnaise", 0), ("Garlic Butter", 0), ("Diane", 0)
+    ]},
+    {"dish": "8oz Sirloin Steak", "group": "Side", "options": [
+        ("None", 0), ("Triple-Cooked Chips", 0), ("House Salad", 0), ("Seasonal Vegetables", 0)
+    ]},
+    # Burger
+    {"dish": "Curious Kitchen Burger", "group": "Extras", "options": [
+        ("None", 0), ("Extra Bacon", 1.50), ("Extra Cheese", 1.00), ("Extra Patty", 3.00)
+    ]},
+    # Sunday roasts - cooking for beef
+    {"dish": "Roast Sirloin of Beef", "group": "Cooking", "options": [
+        ("None / Chef's choice", 0), ("Rare", 0), ("Medium Rare", 0), ("Medium", 0), ("Medium Well", 0), ("Well Done", 0)
+    ]},
+    # Roast extras
+    {"dish": "Roast Sirloin of Beef", "group": "Extras", "options": [
+        ("None", 0), ("Extra Yorkshire Pudding", 1.00), ("Extra Gravy", 0.50)
+    ]},
+    {"dish": "Roast Chicken Supreme", "group": "Extras", "options": [
+        ("None", 0), ("Extra Yorkshire Pudding", 1.00), ("Extra Gravy", 0.50)
+    ]},
+    {"dish": "Roast Pork Loin", "group": "Extras", "options": [
+        ("None", 0), ("Extra Crackling", 0.50), ("Extra Apple Sauce", 0.50)
+    ]},
+]
+
+
+def seed_dish_options():
+    """Seed dish customisation options if the table is empty."""
+    if DishOption.query.first():
+        return  # Already has options, skip
+
+    for entry in SEED_DISH_OPTIONS:
+        dish = MenuItem.query.filter_by(name=entry["dish"]).first()
+        if not dish:
+            continue
+        for i, (option_name, price_mod) in enumerate(entry["options"]):
+            opt = DishOption(
+                menu_item_id=dish.id,
+                option_group=entry["group"],
+                option_name=option_name,
+                price_modifier=price_mod,
+                is_required=False,
+                display_order=i,
+            )
+            db.session.add(opt)
+
+    db.session.commit()
 
 
 SEED_PAIRINGS = [
