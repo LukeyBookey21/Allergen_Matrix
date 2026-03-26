@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getMe, getAdminDishes, deleteDish, toggleDish, toggleSpecial, logout } from "../api";
+import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout } from "../api";
 import AllergenBadge from "../components/AllergenBadge";
-
-const CATEGORIES = ["All", "Starters", "Mains", "Desserts", "Sides"];
 
 export default function AdminDashboard() {
   const [dishes, setDishes] = useState([]);
+  const [menus, setMenus] = useState([]);
   const [loading, setLoading] = useState(true);
   const [qrUrl, setQrUrl] = useState(null);
   const [search, setSearch] = useState("");
+  const [menuFilter, setMenuFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const navigate = useNavigate();
 
@@ -17,8 +17,12 @@ export default function AdminDashboard() {
     async function init() {
       const me = await getMe();
       if (!me) return;
-      const data = await getAdminDishes();
-      setDishes(data || []);
+      const [dishData, menuData] = await Promise.all([
+        getAdminDishes(),
+        getAdminMenus().catch(() => []),
+      ]);
+      setDishes(dishData || []);
+      setMenus(menuData || []);
       setLoading(false);
     }
     init();
@@ -53,10 +57,14 @@ export default function AdminDashboard() {
   const activeDishes = dishes.filter((d) => d.active).length;
   const specialsCount = dishes.filter((d) => d.is_special).length;
 
+  // Get unique categories from current filtered dishes
+  const allCategories = [...new Set(dishes.map((d) => d.category).filter(Boolean))];
+
   const filteredDishes = dishes.filter((d) => {
     const matchesSearch = d.name.toLowerCase().includes(search.toLowerCase());
+    const matchesMenu = menuFilter === "All" || d.menu_slug === menuFilter || d.menu_id === menuFilter;
     const matchesCategory = categoryFilter === "All" || d.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+    return matchesSearch && matchesMenu && matchesCategory;
   });
 
   if (loading) {
@@ -118,6 +126,64 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Menu selector tabs */}
+        {menus.length > 0 && (
+          <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
+            <button
+              onClick={() => setMenuFilter("All")}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                menuFilter === "All"
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "text-slate-500 hover:bg-stone-100"
+              }`}
+            >
+              All Menus
+            </button>
+            {menus.map((menu) => (
+              <button
+                key={menu.slug || menu.id}
+                onClick={() => setMenuFilter(menu.slug || menu.id)}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                  menuFilter === (menu.slug || menu.id)
+                    ? "bg-slate-800 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-stone-100"
+                }`}
+              >
+                {menu.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Category sub-tabs */}
+        {allCategories.length > 0 && (
+          <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
+            <button
+              onClick={() => setCategoryFilter("All")}
+              className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                categoryFilter === "All"
+                  ? "bg-amber-500 text-white"
+                  : "text-slate-400 hover:bg-stone-100"
+              }`}
+            >
+              All Categories
+            </button>
+            {allCategories.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={`px-3 py-1 rounded-md text-xs font-medium whitespace-nowrap transition-all duration-200 ${
+                  categoryFilter === cat
+                    ? "bg-amber-500 text-white"
+                    : "text-slate-400 hover:bg-stone-100"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
           {/* Search */}
@@ -134,7 +200,7 @@ export default function AdminDashboard() {
             />
           </div>
           <Link
-            to="/admin/dishes/new"
+            to={`/admin/dishes/new${menuFilter !== "All" ? `?menu=${menuFilter}` : ""}`}
             className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl hover:bg-amber-600 transition-all duration-200 text-sm font-medium shadow-sm shadow-amber-200 whitespace-nowrap"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -142,23 +208,6 @@ export default function AdminDashboard() {
             </svg>
             Add Dish
           </Link>
-        </div>
-
-        {/* Category tabs */}
-        <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
-          {CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                categoryFilter === cat
-                  ? "bg-slate-800 text-white shadow-sm"
-                  : "text-slate-500 hover:bg-stone-100"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
         </div>
 
         {/* QR Code section */}
@@ -205,6 +254,31 @@ export default function AdminDashboard() {
           </button>
         )}
 
+        {/* Manage Menus section */}
+        {menus.length > 0 && (
+          <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-4 mb-6">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Menus</h3>
+            <div className="flex flex-wrap gap-2">
+              {menus.map((menu) => {
+                const menuDishCount = dishes.filter(
+                  (d) => d.menu_slug === (menu.slug || menu.id) || d.menu_id === (menu.slug || menu.id)
+                ).length;
+                return (
+                  <div
+                    key={menu.slug || menu.id}
+                    className="flex items-center gap-2 bg-stone-50 px-3 py-2 rounded-lg text-sm"
+                  >
+                    <span className="font-medium text-slate-700">{menu.name}</span>
+                    <span className="text-xs text-slate-400">
+                      {menuDishCount} {menuDishCount === 1 ? "dish" : "dishes"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Dishes */}
         {filteredDishes.length === 0 ? (
           <div className="text-center py-16 animate-fade-in">
@@ -228,6 +302,7 @@ export default function AdminDashboard() {
                 <thead>
                   <tr className="border-b border-stone-100">
                     <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Menu</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
                     <th className="text-center px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
@@ -237,143 +312,162 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-50">
-                  {filteredDishes.map((dish) => (
-                    <tr
-                      key={dish.id}
-                      className={`group hover:bg-stone-50 transition-colors ${!dish.active ? "opacity-50" : ""}`}
-                    >
-                      <td className="px-5 py-3.5">
-                        <span className="font-medium text-slate-800">{dish.name}</span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="text-sm text-slate-500">{dish.category || "---"}</span>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className="text-sm font-medium text-slate-700 tabular-nums">
-                          £{Number(dish.price).toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <button
-                          onClick={() => handleToggle(dish.id)}
-                          className={`toggle-switch ${dish.active ? "bg-green-500" : "bg-stone-300"}`}
-                        >
-                          <span
-                            className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`}
-                          />
-                        </button>
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <button
-                          onClick={() => handleToggleSpecial(dish.id)}
-                          className={`transition-all duration-200 ${
-                            dish.is_special
-                              ? "text-amber-500 hover:text-amber-600"
-                              : "text-stone-300 hover:text-amber-400"
-                          }`}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        </button>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex flex-wrap gap-1">
-                          {dish.allergens.map((a) => (
-                            <AllergenBadge key={a.id} allergen={a} small />
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Link
-                            to={`/admin/dishes/${dish.id}/edit`}
-                            className="text-slate-400 hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50 transition-all"
-                            title="Edit"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                            </svg>
-                          </Link>
+                  {filteredDishes.map((dish) => {
+                    const dishMenu = menus.find(
+                      (m) => (m.slug || m.id) === (dish.menu_slug || dish.menu_id)
+                    );
+                    return (
+                      <tr
+                        key={dish.id}
+                        className={`group hover:bg-stone-50 transition-colors ${!dish.active ? "opacity-50" : ""}`}
+                      >
+                        <td className="px-5 py-3.5">
+                          <span className="font-medium text-slate-800">{dish.name}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-xs text-slate-400">{dishMenu?.name || "---"}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-sm text-slate-500">{dish.category || "---"}</span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className="text-sm font-medium text-slate-700 tabular-nums">
+                            {Number(dish.price).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-center">
                           <button
-                            onClick={() => handleDelete(dish.id)}
-                            className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-all"
-                            title="Delete"
+                            onClick={() => handleToggle(dish.id)}
+                            className={`toggle-switch ${dish.active ? "bg-green-500" : "bg-stone-300"}`}
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            <span
+                              className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`}
+                            />
+                          </button>
+                        </td>
+                        <td className="px-5 py-3.5 text-center">
+                          <button
+                            onClick={() => handleToggleSpecial(dish.id)}
+                            className={`transition-all duration-200 ${
+                              dish.is_special
+                                ? "text-amber-500 hover:text-amber-600"
+                                : "text-stone-300 hover:text-amber-400"
+                            }`}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                             </svg>
                           </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-wrap gap-1">
+                            {dish.allergens.map((a) => (
+                              <AllergenBadge key={a.id} allergen={a} small />
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Link
+                              to={`/admin/dishes/${dish.id}/edit`}
+                              className="text-slate-400 hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50 transition-all"
+                              title="Edit"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                              </svg>
+                            </Link>
+                            <button
+                              onClick={() => handleDelete(dish.id)}
+                              className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-all"
+                              title="Delete"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile cards */}
             <div className="md:hidden grid gap-3">
-              {filteredDishes.map((dish) => (
-                <div
-                  key={dish.id}
-                  className={`bg-white rounded-xl border border-stone-100 shadow-sm p-4 ${
-                    !dish.active ? "opacity-50" : ""
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h3 className="font-semibold text-slate-800">{dish.name}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-sm text-slate-500">{dish.category || "---"}</span>
-                        <span className="text-slate-300">-</span>
-                        <span className="text-sm font-medium text-amber-600">£{Number(dish.price).toFixed(2)}</span>
+              {filteredDishes.map((dish) => {
+                const dishMenu = menus.find(
+                  (m) => (m.slug || m.id) === (dish.menu_slug || dish.menu_id)
+                );
+                return (
+                  <div
+                    key={dish.id}
+                    className={`bg-white rounded-xl border border-stone-100 shadow-sm p-4 ${
+                      !dish.active ? "opacity-50" : ""
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <h3 className="font-semibold text-slate-800">{dish.name}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {dishMenu && (
+                            <>
+                              <span className="text-xs text-slate-400">{dishMenu.name}</span>
+                              <span className="text-slate-300">-</span>
+                            </>
+                          )}
+                          <span className="text-sm text-slate-500">{dish.category || "---"}</span>
+                          <span className="text-slate-300">-</span>
+                          <span className="text-sm font-medium text-amber-600">{Number(dish.price).toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleToggleSpecial(dish.id)}
+                          className={`${dish.is_special ? "text-amber-500" : "text-stone-300"}`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    {dish.allergens.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-3">
+                        {dish.allergens.map((a) => (
+                          <AllergenBadge key={a.id} allergen={a} small />
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-3 border-t border-stone-100">
                       <button
-                        onClick={() => handleToggleSpecial(dish.id)}
-                        className={`${dish.is_special ? "text-amber-500" : "text-stone-300"}`}
+                        onClick={() => handleToggle(dish.id)}
+                        className={`toggle-switch ${dish.active ? "bg-green-500" : "bg-stone-300"}`}
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
+                        <span className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`} />
                       </button>
+                      <div className="flex gap-2">
+                        <Link
+                          to={`/admin/dishes/${dish.id}/edit`}
+                          className="text-sm text-slate-500 hover:text-amber-600 font-medium transition-colors"
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          onClick={() => handleDelete(dish.id)}
+                          className="text-sm text-slate-400 hover:text-red-600 font-medium transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
-
-                  {dish.allergens.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {dish.allergens.map((a) => (
-                        <AllergenBadge key={a.id} allergen={a} small />
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between pt-3 border-t border-stone-100">
-                    <button
-                      onClick={() => handleToggle(dish.id)}
-                      className={`toggle-switch ${dish.active ? "bg-green-500" : "bg-stone-300"}`}
-                    >
-                      <span className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`} />
-                    </button>
-                    <div className="flex gap-2">
-                      <Link
-                        to={`/admin/dishes/${dish.id}/edit`}
-                        className="text-sm text-slate-500 hover:text-amber-600 font-medium transition-colors"
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        onClick={() => handleDelete(dish.id)}
-                        className="text-sm text-slate-400 hover:text-red-600 font-medium transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </>
         )}

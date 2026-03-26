@@ -11,9 +11,22 @@ class AdminUser(UserMixin, db.Model):
     password = db.Column(db.String(200), nullable=False)
 
 
+class Menu(db.Model):
+    __tablename__ = "menu"
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)  # e.g. "Dinner Menu", "Bar & Lounge", "Afternoon Tea"
+    slug = db.Column(db.String(100), unique=True, nullable=False)  # URL-friendly name
+    description = db.Column(db.Text, default="")
+    icon = db.Column(db.String(10), default="")  # emoji icon
+    display_order = db.Column(db.Integer, default=0)
+    active = db.Column(db.Boolean, default=True)
+    items = db.relationship("MenuItem", backref="menu", lazy=True)
+
+
 class MenuItem(db.Model):
     __tablename__ = "menu_item"
     id = db.Column(db.Integer, primary_key=True)
+    menu_id = db.Column(db.Integer, db.ForeignKey("menu.id"), nullable=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, default="")
     price = db.Column(db.Float, nullable=False)
@@ -72,4 +85,20 @@ def seed_allergens():
     for name, emoji in SEED_ALLERGENS:
         if not Allergen.query.filter_by(name=name).first():
             db.session.add(Allergen(name=name, icon_emoji=emoji))
+    db.session.commit()
+
+
+SEED_MENUS = [
+    {"name": "Dinner Menu", "slug": "dinner", "description": "The Curious Kitchen evening menu", "icon": "\U0001f37d\ufe0f", "display_order": 1},
+    {"name": "Bar & Lounge", "slug": "bar-lounge", "description": "All-day bar and lounge menu", "icon": "\U0001f378", "display_order": 2},
+    {"name": "Afternoon Tea", "slug": "afternoon-tea", "description": "Traditional afternoon tea - \u00a328.95 per person. Add Prosecco \u00a334.95 / Champagne \u00a339.95", "icon": "\U0001fad6", "display_order": 3},
+    {"name": "Sunday Lunch", "slug": "sunday-lunch", "description": "Sunday roast and classics", "icon": "\U0001f969", "display_order": 4},
+    {"name": "Drinks", "slug": "drinks", "description": "Wines, cocktails, beers and spirits", "icon": "\U0001f377", "display_order": 5},
+]
+
+
+def seed_menus():
+    for menu_data in SEED_MENUS:
+        if not Menu.query.filter_by(slug=menu_data["slug"]).first():
+            db.session.add(Menu(**menu_data))
     db.session.commit()

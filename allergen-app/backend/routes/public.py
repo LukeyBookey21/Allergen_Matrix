@@ -1,12 +1,40 @@
-from flask import Blueprint, jsonify
-from models import MenuItem, Allergen
+from flask import Blueprint, jsonify, request
+from models import MenuItem, Allergen, Menu
 
 public_bp = Blueprint("public", __name__)
 
 
+@public_bp.route("/menus", methods=["GET"])
+def get_menus():
+    """Return all active menus ordered by display_order."""
+    menus = Menu.query.filter_by(active=True).order_by(Menu.display_order).all()
+    return jsonify([
+        {
+            "id": m.id,
+            "name": m.name,
+            "slug": m.slug,
+            "description": m.description,
+            "icon": m.icon,
+            "display_order": m.display_order,
+        }
+        for m in menus
+    ])
+
+
 @public_bp.route("/menu", methods=["GET"])
 def get_menu():
-    dishes = MenuItem.query.filter_by(active=True).order_by(MenuItem.name).all()
+    """Return active dishes. Optional ?menu=slug to filter by menu."""
+    menu_slug = request.args.get("menu")
+
+    query = MenuItem.query.filter_by(active=True)
+
+    if menu_slug:
+        menu = Menu.query.filter_by(slug=menu_slug, active=True).first()
+        if not menu:
+            return jsonify([])
+        query = query.filter_by(menu_id=menu.id)
+
+    dishes = query.order_by(MenuItem.name).all()
     result = []
     for dish in dishes:
         allergens = []
@@ -16,7 +44,7 @@ def get_menu():
                 "name": ma.allergen.name,
                 "icon_emoji": ma.allergen.icon_emoji,
             })
-        result.append({
+        dish_data = {
             "id": dish.id,
             "name": dish.name,
             "description": dish.description,
@@ -25,7 +53,11 @@ def get_menu():
             "is_special": dish.is_special,
             "image_url": dish.image_url,
             "allergens": allergens,
-        })
+            "menu_id": dish.menu_id,
+            "menu_name": dish.menu.name if dish.menu else None,
+            "menu_slug": dish.menu.slug if dish.menu else None,
+        }
+        result.append(dish_data)
     return jsonify(result)
 
 

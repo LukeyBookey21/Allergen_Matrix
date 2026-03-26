@@ -5,7 +5,7 @@ import io
 import qrcode
 from flask import send_file
 
-from models import db, AdminUser, MenuItem, Ingredient, Allergen, MenuItemAllergen
+from models import db, AdminUser, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen
 from parser import parse_and_detect
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -37,6 +37,92 @@ def me():
     return jsonify({"email": current_user.email})
 
 
+# ── Menu CRUD ──────────────────────────────────────────
+
+@admin_bp.route("/menus", methods=["GET"])
+@login_required
+def list_menus():
+    menus = Menu.query.order_by(Menu.display_order).all()
+    return jsonify([
+        {
+            "id": m.id,
+            "name": m.name,
+            "slug": m.slug,
+            "description": m.description,
+            "icon": m.icon,
+            "display_order": m.display_order,
+            "active": m.active,
+        }
+        for m in menus
+    ])
+
+
+@admin_bp.route("/menus", methods=["POST"])
+@login_required
+def create_menu():
+    data = request.get_json()
+    name = data.get("name", "").strip()
+    slug = data.get("slug", "").strip()
+    if not name or not slug:
+        return jsonify({"error": "Name and slug are required"}), 400
+    if Menu.query.filter_by(slug=slug).first():
+        return jsonify({"error": "Slug already exists"}), 400
+    menu = Menu(
+        name=name,
+        slug=slug,
+        description=data.get("description", ""),
+        icon=data.get("icon", ""),
+        display_order=data.get("display_order", 0),
+        active=data.get("active", True),
+    )
+    db.session.add(menu)
+    db.session.commit()
+    return jsonify({"id": menu.id, "message": "Menu created"}), 201
+
+
+@admin_bp.route("/menus/<int:menu_id>", methods=["PUT"])
+@login_required
+def update_menu(menu_id):
+    menu = Menu.query.get_or_404(menu_id)
+    data = request.get_json()
+    menu.name = data.get("name", menu.name).strip()
+    new_slug = data.get("slug", menu.slug).strip()
+    if new_slug != menu.slug:
+        if Menu.query.filter_by(slug=new_slug).first():
+            return jsonify({"error": "Slug already exists"}), 400
+        menu.slug = new_slug
+    menu.description = data.get("description", menu.description)
+    menu.icon = data.get("icon", menu.icon)
+    menu.display_order = data.get("display_order", menu.display_order)
+    menu.active = data.get("active", menu.active)
+    db.session.commit()
+    return jsonify({"message": "Menu updated"})
+
+
+@admin_bp.route("/menus/<int:menu_id>", methods=["DELETE"])
+@login_required
+def delete_menu(menu_id):
+    menu = Menu.query.get_or_404(menu_id)
+    db.session.delete(menu)
+    db.session.commit()
+    return jsonify({"message": "Menu deleted"})
+
+
+# ── Dish CRUD ──────────────────────────────────────────
+
+def _resolve_menu_id(data):
+    """Resolve menu_id from either menu_id or menu_slug in request data."""
+    menu_id = data.get("menu_id")
+    if menu_id is not None:
+        return menu_id
+    menu_slug = data.get("menu_slug")
+    if menu_slug:
+        menu = Menu.query.filter_by(slug=menu_slug).first()
+        if menu:
+            return menu.id
+    return None
+
+
 @admin_bp.route("/dishes", methods=["GET"])
 @login_required
 def list_dishes():
@@ -61,6 +147,9 @@ def list_dishes():
             "category": dish.category,
             "is_special": dish.is_special,
             "image_url": dish.image_url,
+            "menu_id": dish.menu_id,
+            "menu_name": dish.menu.name if dish.menu else None,
+            "menu_slug": dish.menu.slug if dish.menu else None,
             "ingredients": [{"id": i.id, "raw_text": i.raw_text, "parsed_name": i.parsed_name} for i in dish.ingredients],
             "allergens": allergens,
         })
@@ -83,9 +172,11 @@ def add_dish():
     category = data.get("category", "Mains")
     is_special = data.get("is_special", False)
     image_url = data.get("image_url", "")
+    menu_id = _resolve_menu_id(data)
 
     dish = MenuItem(name=name, description=description, price=float(price), active=True,
-                    category=category, is_special=is_special, image_url=image_url)
+                    category=category, is_special=is_special, image_url=image_url,
+                    menu_id=menu_id)
     db.session.add(dish)
     db.session.flush()
 
@@ -129,6 +220,10 @@ def edit_dish(dish_id):
     dish.category = data.get("category", dish.category)
     dish.is_special = data.get("is_special", dish.is_special)
     dish.image_url = data.get("image_url", dish.image_url)
+
+    # Update menu assignment if provided
+    if "menu_id" in data or "menu_slug" in data:
+        dish.menu_id = _resolve_menu_id(data)
 
     ingredients_text = data.get("ingredients")
     if ingredients_text is not None:

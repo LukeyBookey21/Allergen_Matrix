@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   getMe,
   getAdminDishes,
+  getAdminMenus,
   createDish,
   updateDish,
   detectAllergens,
@@ -47,6 +48,7 @@ const CATEGORIES = ["Starters", "Mains", "Desserts", "Sides"];
 
 export default function AddEditDish() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const isEdit = Boolean(id);
   const navigate = useNavigate();
 
@@ -54,6 +56,8 @@ export default function AddEditDish() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("Mains");
+  const [menuSlug, setMenuSlug] = useState(searchParams.get("menu") || "");
+  const [menus, setMenus] = useState([]);
   const [isSpecial, setIsSpecial] = useState(false);
   const [ingredients, setIngredients] = useState("");
   const [selectedAllergens, setSelectedAllergens] = useState([]);
@@ -68,6 +72,9 @@ export default function AddEditDish() {
       const me = await getMe();
       if (!me) return;
 
+      const menuData = await getAdminMenus().catch(() => []);
+      setMenus(menuData || []);
+
       if (isEdit) {
         const dishes = await getAdminDishes();
         const dish = dishes?.find((d) => d.id === parseInt(id));
@@ -76,6 +83,7 @@ export default function AddEditDish() {
           setDescription(dish.description || "");
           setPrice(String(dish.price));
           setCategory(dish.category || "Mains");
+          setMenuSlug(dish.menu_slug || dish.menu_id || "");
           setIsSpecial(dish.is_special || false);
           setIngredients(
             dish.ingredients.map((i) => i.raw_text).join("\n")
@@ -117,6 +125,7 @@ export default function AddEditDish() {
       description,
       price: parseFloat(price) || 0,
       category,
+      menu_slug: menuSlug,
       is_special: isSpecial,
       ingredients,
       allergen_names: selectedAllergens,
@@ -191,6 +200,27 @@ export default function AddEditDish() {
               </h2>
 
               <div className="space-y-4">
+                {/* Menu selector */}
+                {menus.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600 mb-1.5">
+                      Menu
+                    </label>
+                    <select
+                      value={menuSlug}
+                      onChange={(e) => setMenuSlug(e.target.value)}
+                      className="w-full border border-stone-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
+                    >
+                      <option value="">Select a menu...</option>
+                      {menus.map((menu) => (
+                        <option key={menu.slug || menu.id} value={menu.slug || menu.id}>
+                          {menu.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-slate-600 mb-1.5">
                     Dish Name

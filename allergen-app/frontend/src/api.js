@@ -35,6 +35,11 @@ export async function getAdminDishes() {
   return res?.json();
 }
 
+export async function getAdminMenus() {
+  const res = await apiFetch("/admin/menus");
+  return res?.json();
+}
+
 export async function createDish(data) {
   const res = await apiFetch("/admin/dishes", {
     method: "POST",
@@ -79,6 +84,16 @@ export async function overrideAllergens(id, allergenNames) {
     method: "POST",
     body: JSON.stringify({ allergen_names: allergenNames }),
   });
+  return res.json();
+}
+
+export async function getMenus() {
+  const res = await fetch("/menus");
+  return res.json();
+}
+
+export async function getMenuBySlug(slug) {
+  const res = await fetch(`/menu?menu=${slug}`);
   return res.json();
 }
 

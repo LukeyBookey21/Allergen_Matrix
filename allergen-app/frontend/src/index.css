@@ -38,12 +38,63 @@
   @apply bg-slate-400;
 }
 
+/* Hide scrollbar for menu tabs */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Smooth transitions globally */
 * {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Animations */
+/* =============================================
+   Menu Row Styles - elegant restaurant menu
+   ============================================= */
+
+.menu-row {
+  @apply relative;
+}
+
+.menu-row-dots {
+  @apply flex-1 self-end mb-1;
+  min-width: 1.5rem;
+  border-bottom: 1px dotted;
+  border-color: rgba(168, 162, 158, 0.5);
+}
+
+/* Subtle allergen conflict indicator */
+.menu-row-conflict {
+  @apply relative;
+  padding-left: 0.75rem;
+}
+
+.menu-row-conflict::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  bottom: 0.5rem;
+  width: 3px;
+  border-radius: 2px;
+  background-color: rgba(239, 68, 68, 0.35);
+}
+
+/* Allergen dot conflict highlight */
+.allergen-dot-conflict {
+  @apply opacity-100;
+  filter: drop-shadow(0 0 3px rgba(239, 68, 68, 0.4));
+  transform: scale(1.15);
+}
+
+/* =============================================
+   Animations
+   ============================================= */
+
 @keyframes slideDown {
   from {
     transform: translateY(-10px);
@@ -60,6 +111,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeInFast {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes slideIn {
   from {
     transform: translateY(-100%);
@@ -68,6 +124,15 @@
   to {
     transform: translateY(0);
     opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 
@@ -89,8 +154,16 @@
   animation: fadeIn 0.4s ease-out both;
 }
 
+.animate-fade-in-fast {
+  animation: fadeInFast 0.2s ease-out both;
+}
+
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .animate-sparkle {

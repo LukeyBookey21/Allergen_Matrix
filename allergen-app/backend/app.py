@@ -7,7 +7,7 @@ from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
 from config import Config
-from models import db, AdminUser, seed_allergens
+from models import db, AdminUser, seed_allergens, seed_menus
 from seed_data import seed_dishes
 from routes.admin import admin_bp
 from routes.public import public_bp
@@ -53,6 +53,7 @@ def create_app():
     with app.app_context():
         db.create_all()
         seed_allergens()
+        seed_menus()
         seed_dishes()
 
         # Create admin user if not exists

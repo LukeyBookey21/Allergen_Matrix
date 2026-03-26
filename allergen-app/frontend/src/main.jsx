@@ -13,6 +13,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
       <Routes>
         <Route path="/" element={<CustomerMenu />} />
         <Route path="/menu" element={<CustomerMenu />} />
+        <Route path="/menu/:menuSlug" element={<CustomerMenu />} />
         <Route path="/admin/login" element={<Login />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/admin/dishes/new" element={<AddEditDish />} />
