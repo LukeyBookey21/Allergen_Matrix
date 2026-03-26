@@ -21,6 +21,9 @@ def get_menu():
             "name": dish.name,
             "description": dish.description,
             "price": dish.price,
+            "category": dish.category,
+            "is_special": dish.is_special,
+            "image_url": dish.image_url,
             "allergens": allergens,
         })
     return jsonify(result)
@@ -33,3 +36,9 @@ def get_allergens():
         {"id": a.id, "name": a.name, "icon_emoji": a.icon_emoji}
         for a in allergens
     ])
+
+
+@public_bp.route("/menu/categories", methods=["GET"])
+def get_categories():
+    categories = ["Starters", "Mains", "Desserts", "Sides", "Specials"]
+    return jsonify(categories)

@@ -58,6 +58,9 @@ def list_dishes():
             "description": dish.description,
             "price": dish.price,
             "active": dish.active,
+            "category": dish.category,
+            "is_special": dish.is_special,
+            "image_url": dish.image_url,
             "ingredients": [{"id": i.id, "raw_text": i.raw_text, "parsed_name": i.parsed_name} for i in dish.ingredients],
             "allergens": allergens,
         })
@@ -77,7 +80,12 @@ def add_dish():
     if not name:
         return jsonify({"error": "Name is required"}), 400
 
-    dish = MenuItem(name=name, description=description, price=float(price), active=True)
+    category = data.get("category", "Mains")
+    is_special = data.get("is_special", False)
+    image_url = data.get("image_url", "")
+
+    dish = MenuItem(name=name, description=description, price=float(price), active=True,
+                    category=category, is_special=is_special, image_url=image_url)
     db.session.add(dish)
     db.session.flush()
 
@@ -118,6 +126,9 @@ def edit_dish(dish_id):
     dish.name = data.get("name", dish.name).strip()
     dish.description = data.get("description", dish.description).strip()
     dish.price = float(data.get("price", dish.price))
+    dish.category = data.get("category", dish.category)
+    dish.is_special = data.get("is_special", dish.is_special)
+    dish.image_url = data.get("image_url", dish.image_url)
 
     ingredients_text = data.get("ingredients")
     if ingredients_text is not None:
@@ -180,6 +191,15 @@ def toggle_dish(dish_id):
     return jsonify({"active": dish.active})
 
 
+@admin_bp.route("/dishes/<int:dish_id>/toggle-special", methods=["PATCH"])
+@login_required
+def toggle_special(dish_id):
+    dish = MenuItem.query.get_or_404(dish_id)
+    dish.is_special = not dish.is_special
+    db.session.commit()
+    return jsonify({"is_special": dish.is_special})
+
+
 @admin_bp.route("/dishes/<int:dish_id>/override-allergens", methods=["POST"])
 @login_required
 def override_allergens(dish_id):
@@ -201,6 +221,15 @@ def override_allergens(dish_id):
 
     db.session.commit()
     return jsonify({"message": "Allergens overridden"})
+
+
+MENU_CATEGORIES = ["Starters", "Mains", "Desserts", "Sides", "Specials"]
+
+
+@admin_bp.route("/categories", methods=["GET"])
+@login_required
+def get_categories():
+    return jsonify(MENU_CATEGORIES)
 
 
 @admin_bp.route("/detect-allergens", methods=["POST"])

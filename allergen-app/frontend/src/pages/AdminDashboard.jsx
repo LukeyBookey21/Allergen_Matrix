@@ -1,12 +1,16 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getMe, getAdminDishes, deleteDish, toggleDish, logout } from "../api";
+import { getMe, getAdminDishes, deleteDish, toggleDish, toggleSpecial, logout } from "../api";
 import AllergenBadge from "../components/AllergenBadge";
+
+const CATEGORIES = ["All", "Starters", "Mains", "Desserts", "Sides"];
 
 export default function AdminDashboard() {
   const [dishes, setDishes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [qrUrl, setQrUrl] = useState(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,8 +37,11 @@ export default function AdminDashboard() {
     );
   }
 
-  function handleShowQR() {
-    setQrUrl("/admin/qr-code?" + Date.now());
+  async function handleToggleSpecial(id) {
+    const result = await toggleSpecial(id);
+    setDishes((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, is_special: result.is_special } : d))
+    );
   }
 
   async function handleLogout() {
@@ -42,133 +49,335 @@ export default function AdminDashboard() {
     navigate("/admin/login");
   }
 
+  const totalDishes = dishes.length;
+  const activeDishes = dishes.filter((d) => d.active).length;
+  const specialsCount = dishes.filter((d) => d.is_special).length;
+
+  const filteredDishes = dishes.filter((d) => {
+    const matchesSearch = d.name.toLowerCase().includes(search.toLowerCase());
+    const matchesCategory = categoryFilter === "All" || d.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-gray-500">Loading...</p>
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
+          <p className="text-slate-400 text-sm font-medium">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <div className="flex gap-3">
-          <button
-            onClick={handleShowQR}
-            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition text-sm"
-          >
-            QR Code
-          </button>
+    <div className="min-h-screen bg-stone-50">
+      {/* Header */}
+      <header className="bg-slate-800 text-white shadow-lg">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="font-display text-xl sm:text-2xl font-bold">
+              Curious Kitchen
+            </h1>
+            <span className="hidden sm:inline text-slate-500 font-light">|</span>
+            <span className="hidden sm:inline text-slate-400 text-sm font-medium">
+              Admin
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/"
+              className="text-sm text-slate-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-700"
+            >
+              View Menu
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="text-sm text-slate-400 hover:text-red-400 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-700"
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Stats bar */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Total Dishes</p>
+            <p className="text-2xl font-bold text-slate-800 mt-1">{totalDishes}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Active</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">{activeDishes}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm">
+            <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Specials</p>
+            <p className="text-2xl font-bold text-amber-500 mt-1">{specialsCount}</p>
+          </div>
+        </div>
+
+        {/* Action bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
+          {/* Search */}
+          <div className="relative flex-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search dishes..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
+            />
+          </div>
           <Link
             to="/admin/dishes/new"
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
+            className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl hover:bg-amber-600 transition-all duration-200 text-sm font-medium shadow-sm shadow-amber-200 whitespace-nowrap"
           >
-            + Add New Dish
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Add Dish
           </Link>
-          <button
-            onClick={handleLogout}
-            className="bg-red-50 text-red-600 px-4 py-2 rounded-lg hover:bg-red-100 transition text-sm"
-          >
-            Logout
-          </button>
         </div>
-      </div>
 
-      {qrUrl && (
-        <div className="bg-white rounded-lg shadow p-6 mb-6 text-center">
-          <h2 className="text-lg font-semibold mb-4">Menu QR Code</h2>
-          <img src={qrUrl} alt="QR Code" className="mx-auto mb-4 w-48 h-48" />
-          <a
-            href={qrUrl}
-            download="menu-qr-code.png"
-            className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm"
-          >
-            Download QR Code
-          </a>
-          <button
-            onClick={() => setQrUrl(null)}
-            className="ml-3 text-gray-500 text-sm hover:text-gray-700"
-          >
-            Close
-          </button>
+        {/* Category tabs */}
+        <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setCategoryFilter(cat)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
+                categoryFilter === cat
+                  ? "bg-slate-800 text-white shadow-sm"
+                  : "text-slate-500 hover:bg-stone-100"
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
-      )}
 
-      {dishes.length === 0 ? (
-        <div className="text-center py-16 text-gray-500">
-          <p className="text-lg mb-2">No dishes yet</p>
-          <p>Add your first dish to get started.</p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">
-                  Name
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">
-                  Price
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">
-                  Status
-                </th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-gray-600">
-                  Allergens
-                </th>
-                <th className="text-right px-4 py-3 text-sm font-medium text-gray-600">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {dishes.map((dish) => (
-                <tr key={dish.id} className={!dish.active ? "opacity-50" : ""}>
-                  <td className="px-4 py-3 font-medium">{dish.name}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    £{dish.price.toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      onClick={() => handleToggle(dish.id)}
-                      className={`text-xs px-2 py-1 rounded-full ${
-                        dish.active
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-500"
-                      }`}
+        {/* QR Code section */}
+        {qrUrl ? (
+          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6 mb-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row items-center gap-6">
+              <img src={qrUrl} alt="QR Code" className="w-40 h-40 rounded-xl border border-stone-100" />
+              <div className="text-center sm:text-left">
+                <h3 className="font-semibold text-lg text-slate-800 mb-1">Menu QR Code</h3>
+                <p className="text-sm text-slate-500 mb-4">
+                  Print and display this at your venue so customers can scan to view the menu.
+                </p>
+                <div className="flex gap-2 justify-center sm:justify-start">
+                  <a
+                    href={qrUrl}
+                    download="menu-qr-code.png"
+                    className="inline-flex items-center gap-2 bg-slate-800 text-white px-4 py-2 rounded-xl hover:bg-slate-700 transition text-sm font-medium"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                    Download for your venue
+                  </a>
+                  <button
+                    onClick={() => setQrUrl(null)}
+                    className="text-slate-400 hover:text-slate-600 px-3 py-2 rounded-xl hover:bg-stone-50 text-sm transition"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setQrUrl("/admin/qr-code?" + Date.now())}
+            className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-4 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 2V5h1v1H5zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zm1 2v1h1V5h-1z" clipRule="evenodd" />
+              <path d="M11 4a1 1 0 10-2 0v1a1 1 0 002 0V4zM10 7a1 1 0 011 1v1h2a1 1 0 110 2h-3a1 1 0 01-1-1V8a1 1 0 011-1zM16 9a1 1 0 100 2 1 1 0 000-2zM9 13a1 1 0 011-1h1a1 1 0 110 2v2a1 1 0 11-2 0v-3zM7 11a1 1 0 100-2H4a1 1 0 100 2h3zM17 13a1 1 0 01-1 1h-2a1 1 0 110-2h2a1 1 0 011 1zM16 17a1 1 0 100-2h-3a1 1 0 100 2h3z" />
+            </svg>
+            Show QR Code
+          </button>
+        )}
+
+        {/* Dishes */}
+        {filteredDishes.length === 0 ? (
+          <div className="text-center py-16 animate-fade-in">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-stone-100 mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </div>
+            <p className="text-slate-500 font-medium">No dishes found</p>
+            <p className="text-slate-400 text-sm mt-1">
+              {dishes.length === 0
+                ? "Add your first dish to get started."
+                : "Try adjusting your search or filters."}
+            </p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-stone-100">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Name</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Category</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Price</th>
+                    <th className="text-center px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="text-center px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Special</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Allergens</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-50">
+                  {filteredDishes.map((dish) => (
+                    <tr
+                      key={dish.id}
+                      className={`group hover:bg-stone-50 transition-colors ${!dish.active ? "opacity-50" : ""}`}
                     >
-                      {dish.active ? "Active" : "Inactive"}
-                    </button>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
+                      <td className="px-5 py-3.5">
+                        <span className="font-medium text-slate-800">{dish.name}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="text-sm text-slate-500">{dish.category || "---"}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="text-sm font-medium text-slate-700 tabular-nums">
+                          £{Number(dish.price).toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-center">
+                        <button
+                          onClick={() => handleToggle(dish.id)}
+                          className={`toggle-switch ${dish.active ? "bg-green-500" : "bg-stone-300"}`}
+                        >
+                          <span
+                            className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`}
+                          />
+                        </button>
+                      </td>
+                      <td className="px-5 py-3.5 text-center">
+                        <button
+                          onClick={() => handleToggleSpecial(dish.id)}
+                          className={`transition-all duration-200 ${
+                            dish.is_special
+                              ? "text-amber-500 hover:text-amber-600"
+                              : "text-stone-300 hover:text-amber-400"
+                          }`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </button>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-wrap gap-1">
+                          {dish.allergens.map((a) => (
+                            <AllergenBadge key={a.id} allergen={a} small />
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 text-right">
+                        <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Link
+                            to={`/admin/dishes/${dish.id}/edit`}
+                            className="text-slate-400 hover:text-amber-600 p-1.5 rounded-lg hover:bg-amber-50 transition-all"
+                            title="Edit"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                          </Link>
+                          <button
+                            onClick={() => handleDelete(dish.id)}
+                            className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-all"
+                            title="Delete"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden grid gap-3">
+              {filteredDishes.map((dish) => (
+                <div
+                  key={dish.id}
+                  className={`bg-white rounded-xl border border-stone-100 shadow-sm p-4 ${
+                    !dish.active ? "opacity-50" : ""
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div>
+                      <h3 className="font-semibold text-slate-800">{dish.name}</h3>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-sm text-slate-500">{dish.category || "---"}</span>
+                        <span className="text-slate-300">-</span>
+                        <span className="text-sm font-medium text-amber-600">£{Number(dish.price).toFixed(2)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleSpecial(dish.id)}
+                        className={`${dish.is_special ? "text-amber-500" : "text-stone-300"}`}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {dish.allergens.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-3">
                       {dish.allergens.map((a) => (
                         <AllergenBadge key={a.id} allergen={a} small />
                       ))}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/admin/dishes/${dish.id}/edit`}
-                      className="text-blue-600 hover:text-blue-800 text-sm mr-3"
-                    >
-                      Edit
-                    </Link>
+                  )}
+
+                  <div className="flex items-center justify-between pt-3 border-t border-stone-100">
                     <button
-                      onClick={() => handleDelete(dish.id)}
-                      className="text-red-600 hover:text-red-800 text-sm"
+                      onClick={() => handleToggle(dish.id)}
+                      className={`toggle-switch ${dish.active ? "bg-green-500" : "bg-stone-300"}`}
                     >
-                      Delete
+                      <span className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`} />
                     </button>
-                  </td>
-                </tr>
+                    <div className="flex gap-2">
+                      <Link
+                        to={`/admin/dishes/${dish.id}/edit`}
+                        className="text-sm text-slate-500 hover:text-amber-600 font-medium transition-colors"
+                      >
+                        Edit
+                      </Link>
+                      <button
+                        onClick={() => handleDelete(dish.id)}
+                        className="text-sm text-slate-400 hover:text-red-600 font-medium transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -61,6 +61,11 @@ export async function toggleDish(id) {
   return res.json();
 }
 
+export async function toggleSpecial(id) {
+  const res = await apiFetch(`/admin/dishes/${id}/toggle-special`, { method: "PATCH" });
+  return res.json();
+}
+
 export async function detectAllergens(ingredients) {
   const res = await apiFetch("/admin/detect-allergens", {
     method: "POST",
@@ -84,5 +89,10 @@ export async function getMenu() {
 
 export async function getAllergens() {
   const res = await fetch("/menu/allergens");
+  return res.json();
+}
+
+export async function fetchCategories() {
+  const res = await fetch("/menu/categories");
   return res.json();
 }
