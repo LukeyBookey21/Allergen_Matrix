@@ -1,30 +1,28 @@
 import logging
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail, HtmlContent
+import resend
 from flask import current_app
 
 logger = logging.getLogger(__name__)
 
 
 def _send_email(to_email, subject, html_content):
-    """Send an email via SendGrid. Fails silently with logging."""
-    api_key = current_app.config.get("SENDGRID_API_KEY", "")
-    from_email = current_app.config.get("FROM_EMAIL", "noreply@curiouskitchen.com")
+    """Send an email via Resend. Fails silently with logging."""
+    api_key = current_app.config.get("RESEND_API_KEY", "")
+    from_email = current_app.config.get("FROM_EMAIL", "onboarding@resend.dev")
 
     if not api_key:
-        logger.warning("SendGrid API key not set — email not sent to %s: %s", to_email, subject)
+        logger.warning("Resend API key not set — email not sent to %s: %s", to_email, subject)
         return False
 
     try:
-        message = Mail(
-            from_email=from_email,
-            to_emails=to_email,
-            subject=subject,
-            html_content=html_content,
-        )
-        sg = SendGridAPIClient(api_key)
-        response = sg.send(message)
-        logger.info("Email sent to %s (status: %s)", to_email, response.status_code)
+        resend.api_key = api_key
+        r = resend.Emails.send({
+            "from": from_email,
+            "to": [to_email],
+            "subject": subject,
+            "html": html_content,
+        })
+        logger.info("Email sent to %s (id: %s)", to_email, r.get("id", "unknown"))
         return True
     except Exception as e:
         logger.error("Failed to send email to %s: %s", to_email, e)
