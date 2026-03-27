@@ -1,9 +1,12 @@
 import json
+import logging
 import string
 import random
 
 from flask import Blueprint, jsonify, request
 from models import db, MenuItem, Allergen, Menu, Order, OrderItem, Pairing, DishOption, PreOrder, PreOrderGuest, PreOrderItem
+
+logger = logging.getLogger(__name__)
 
 public_bp = Blueprint("public", __name__, url_prefix="/api")
 
@@ -122,7 +125,7 @@ def create_order():
 
     db.session.commit()
 
-    # Return full order data
+    # Return full order data — also used for admin email
     order_items = []
     total = 0.0
     for oi in order.items:
@@ -137,6 +140,13 @@ def create_order():
             "quantity": oi.quantity,
             "notes": oi.notes,
         })
+
+    # Send admin notification
+    try:
+        from email_service import send_order_admin_notification
+        send_order_admin_notification(order, order_items, total)
+    except Exception as e:
+        logger.warning("Email sending failed for order %s: %s", order.id, e)
 
     return jsonify({
         "id": order.id,
@@ -283,6 +293,14 @@ def create_pre_order():
             db.session.add(item)
 
     db.session.commit()
+
+    # Send emails
+    try:
+        from email_service import send_pre_order_confirmation, send_pre_order_admin_notification
+        send_pre_order_confirmation(pre_order)
+        send_pre_order_admin_notification(pre_order)
+    except Exception as e:
+        logger.warning("Email sending failed for pre-order %s: %s", pre_order.reference, e)
 
     return jsonify({
         "id": pre_order.id,

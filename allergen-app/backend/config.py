@@ -9,3 +9,7 @@ class Config:
     ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@restaurant.com")
     ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "changeme123")
     ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+    SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "")
+    ADMIN_NOTIFICATION_EMAIL = os.environ.get("ADMIN_NOTIFICATION_EMAIL", os.environ.get("ADMIN_EMAIL", "admin@restaurant.com"))
+    RESTAURANT_NAME = "Curious Kitchen — Thorpe Park Hotel & Spa"
+    FROM_EMAIL = os.environ.get("FROM_EMAIL", "noreply@curiouskitchen.com")
