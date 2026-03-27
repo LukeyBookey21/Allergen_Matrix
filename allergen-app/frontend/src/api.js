@@ -308,3 +308,14 @@ export async function getAnalytics() {
     return await res.json();
   } catch { return null; }
 }
+
+export async function getAllergyMatrix(allergens, menuSlug) {
+  try {
+    const res = await apiFetch("/admin/allergy-matrix", {
+      method: "POST",
+      body: JSON.stringify({ allergens, menu_slug: menuSlug }),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch { return null; }
+}

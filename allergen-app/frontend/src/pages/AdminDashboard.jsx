@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus, getAdminPreOrders, updatePreOrderStatus, getAnalytics } from "../api";
+import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus, getAdminPreOrders, updatePreOrderStatus, getAnalytics, getAllergyMatrix } from "../api";
 import AllergenBadge from "../components/AllergenBadge";
 
 export default function AdminDashboard() {
@@ -23,6 +23,10 @@ export default function AdminDashboard() {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [userRole, setUserRole] = useState("chef");
   const [showAllergenRef, setShowAllergenRef] = useState(false);
+  const [matrixAllergens, setMatrixAllergens] = useState([]);
+  const [matrixMenuSlug, setMatrixMenuSlug] = useState("");
+  const [matrixResult, setMatrixResult] = useState(null);
+  const [matrixLoading, setMatrixLoading] = useState(false);
   const ordersInterval = useRef(null);
   const previousOrderCount = useRef(0);
   const preOrdersInterval = useRef(null);
@@ -171,6 +175,8 @@ export default function AdminDashboard() {
   const allCategories = [...new Set(dishes.map((d) => d.category).filter(Boolean))];
 
   const filteredDishes = dishes.filter((d) => {
+    // Chef: hide drinks menu items
+    if (userRole === "chef" && d.menu_slug === "drinks") return false;
     const matchesSearch = d.name.toLowerCase().includes(search.toLowerCase());
     const matchesMenu = menuFilter === "All" || d.menu_slug === menuFilter || d.menu_id === menuFilter;
     const matchesCategory = categoryFilter === "All" || d.category === categoryFilter;
@@ -266,6 +272,16 @@ export default function AdminDashboard() {
             )}
           </button>
           <button
+            onClick={() => setActiveTab("matrix")}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              activeTab === "matrix"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Allergy Matrix
+          </button>
+          <button
             onClick={() => setActiveTab("analytics")}
             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
               activeTab === "analytics"
@@ -335,7 +351,7 @@ export default function AdminDashboard() {
             >
               All Menus
             </button>
-            {menus.map((menu) => (
+            {menus.filter((menu) => !(userRole === "chef" && (menu.slug || menu.id) === "drinks")).map((menu) => (
               <button
                 key={menu.slug || menu.id}
                 onClick={() => setMenuFilter(menu.slug || menu.id)}
@@ -414,7 +430,17 @@ export default function AdminDashboard() {
               className="w-full pl-9 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
             />
           </div>
-          {userRole !== "foh" && (
+          {userRole === "foh" ? (
+          <Link
+            to="/admin/dishes/new?menu=drinks"
+            className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl hover:bg-amber-600 transition-all duration-200 text-sm font-medium shadow-sm shadow-amber-200 whitespace-nowrap"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+            </svg>
+            Add Drink
+          </Link>
+          ) : (
           <Link
             to={`/admin/dishes/new${menuFilter !== "All" ? `?menu=${menuFilter}` : ""}`}
             className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl hover:bg-amber-600 transition-all duration-200 text-sm font-medium shadow-sm shadow-amber-200 whitespace-nowrap"
@@ -600,7 +626,7 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          {userRole !== "foh" && (
+                          {(userRole === "foh" ? dish.menu_slug === "drinks" : true) && (
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Link
                               to={`/admin/dishes/${dish.id}/edit`}
@@ -611,6 +637,7 @@ export default function AdminDashboard() {
                                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                               </svg>
                             </Link>
+                            {userRole !== "foh" && (
                             <button
                               onClick={() => handleDelete(dish.id)}
                               className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-all"
@@ -620,6 +647,7 @@ export default function AdminDashboard() {
                                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                               </svg>
                             </button>
+                            )}
                           </div>
                           )}
                         </td>
@@ -701,7 +729,7 @@ export default function AdminDashboard() {
                       >
                         <span className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`} />
                       </button>
-                      {userRole !== "foh" && (
+                      {(userRole === "foh" ? dish.menu_slug === "drinks" : true) && (
                       <div className="flex gap-2">
                         <Link
                           to={`/admin/dishes/${dish.id}/edit`}
@@ -709,12 +737,14 @@ export default function AdminDashboard() {
                         >
                           Edit
                         </Link>
+                        {userRole !== "foh" && (
                         <button
                           onClick={() => handleDelete(dish.id)}
                           className="text-sm text-slate-400 hover:text-red-600 font-medium transition-colors"
                         >
                           Delete
                         </button>
+                        )}
                       </div>
                       )}
                     </div>
@@ -875,6 +905,142 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Allergy Matrix Tab */}
+        {activeTab === "matrix" && (
+          <div>
+            <h2 className="text-lg font-bold text-slate-800 mb-4">Allergy Matrix</h2>
+            <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5 mb-6">
+              <p className="text-sm font-medium text-slate-600 mb-3">Select customer's allergens:</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2 mb-4">
+                {[
+                  {name: "Celery", emoji: "\u{1F33F}"}, {name: "Gluten", emoji: "\u{1F33E}"},
+                  {name: "Crustaceans", emoji: "\u{1F990}"}, {name: "Eggs", emoji: "\u{1F95A}"},
+                  {name: "Fish", emoji: "\u{1F41F}"}, {name: "Lupin", emoji: "\u{1F338}"},
+                  {name: "Milk", emoji: "\u{1F95B}"}, {name: "Molluscs", emoji: "\u{1F991}"},
+                  {name: "Mustard", emoji: "\u{1F7E1}"}, {name: "Peanuts", emoji: "\u{1F95C}"},
+                  {name: "Sesame", emoji: "\u{1F330}"}, {name: "Soybeans", emoji: "\u{1FAD8}"},
+                  {name: "Sulphites", emoji: "\u{1F377}"}, {name: "Tree Nuts", emoji: "\u{1F333}"},
+                ].map(a => (
+                  <button
+                    key={a.name}
+                    onClick={() => setMatrixAllergens(prev => prev.includes(a.name) ? prev.filter(x => x !== a.name) : [...prev, a.name])}
+                    className={`rounded-lg p-2 text-center text-xs font-medium transition-all duration-200 border ${
+                      matrixAllergens.includes(a.name)
+                        ? "bg-red-50 border-red-300 text-red-700 ring-1 ring-red-200"
+                        : "bg-stone-50 border-stone-200 text-slate-600 hover:bg-stone-100"
+                    }`}
+                  >
+                    <span className="text-lg block">{a.emoji}</span>
+                    {a.name}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium text-slate-500">Filter by menu:</label>
+                  <select
+                    value={matrixMenuSlug}
+                    onChange={(e) => setMatrixMenuSlug(e.target.value)}
+                    className="text-sm border border-stone-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
+                  >
+                    <option value="">All</option>
+                    {menus.map(m => (
+                      <option key={m.slug || m.id} value={m.slug || m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (matrixAllergens.length === 0) return;
+                    setMatrixLoading(true);
+                    const result = await getAllergyMatrix(matrixAllergens, matrixMenuSlug);
+                    setMatrixResult(result);
+                    setMatrixLoading(false);
+                  }}
+                  disabled={matrixAllergens.length === 0 || matrixLoading}
+                  className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl hover:bg-amber-600 transition-all duration-200 text-sm font-medium shadow-sm shadow-amber-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {matrixLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Checking...
+                    </>
+                  ) : "Check Matrix"}
+                </button>
+              </div>
+            </div>
+
+            {matrixResult && (
+              <div className="space-y-6">
+                {/* Safe Dishes */}
+                {matrixResult.safe && matrixResult.safe.length > 0 && (
+                  <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                    <div className="border-l-4 border-green-500 p-5">
+                      <h3 className="font-bold text-green-700 mb-3 flex items-center gap-2">
+                        <span className="text-green-500">&#10003;</span> Safe Dishes ({matrixResult.safe.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {matrixResult.safe.map((dish, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm">
+                            <span className="text-slate-400">&#9500;&#9472;&#9472;</span>
+                            <span className="font-medium text-slate-700">{dish.name}</span>
+                            {dish.price != null && (
+                              <span className="text-slate-400">&mdash; &pound;{Number(dish.price).toFixed(2)}</span>
+                            )}
+                            {dish.menu_name && (
+                              <span className="text-xs text-slate-400">({dish.menu_name})</span>
+                            )}
+                            {dish.dietary_labels && dish.dietary_labels.split(",").map(l => l.trim()).filter(Boolean).map(l => (
+                              <span key={l} className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[9px] font-bold flex-shrink-0 ${
+                                l === "VG" ? "bg-green-600 text-white" :
+                                l === "V" ? "bg-green-500 text-white" :
+                                l === "GF" ? "bg-amber-500 text-white" :
+                                "bg-slate-400 text-white"
+                              }`}>{l}</span>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Unsafe Dishes */}
+                {matrixResult.unsafe && matrixResult.unsafe.length > 0 && (
+                  <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+                    <div className="border-l-4 border-red-500 p-5">
+                      <h3 className="font-bold text-red-700 mb-3 flex items-center gap-2">
+                        <span className="text-red-500">&#10007;</span> Unsafe Dishes ({matrixResult.unsafe.length})
+                      </h3>
+                      <div className="space-y-2">
+                        {matrixResult.unsafe.map((dish, idx) => (
+                          <div key={idx} className="flex items-center gap-2 text-sm flex-wrap">
+                            <span className="text-slate-400">&#9500;&#9472;&#9472;</span>
+                            <span className="font-medium text-slate-700">{dish.name}</span>
+                            {dish.price != null && (
+                              <span className="text-slate-400">&mdash; &pound;{Number(dish.price).toFixed(2)}</span>
+                            )}
+                            {dish.conflicting_allergens && dish.conflicting_allergens.length > 0 && (
+                              <span className="text-xs text-red-500 font-medium">
+                                contains {dish.conflicting_allergens.join(", ")}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(!matrixResult.safe || matrixResult.safe.length === 0) && (!matrixResult.unsafe || matrixResult.unsafe.length === 0) && (
+                  <div className="text-center py-8 text-slate-400 text-sm">No results returned. Try different allergens or menu filter.</div>
+                )}
               </div>
             )}
           </div>

@@ -1,12 +1,14 @@
 import logging
-import resend
+import json
+import urllib.request
+import urllib.error
 from flask import current_app
 
 logger = logging.getLogger(__name__)
 
 
 def _send_email(to_email, subject, html_content):
-    """Send an email via Resend. Fails silently with logging."""
+    """Send an email via Resend API. Fails silently with logging. No external package needed."""
     api_key = current_app.config.get("RESEND_API_KEY", "")
     from_email = current_app.config.get("FROM_EMAIL", "onboarding@resend.dev")
 
@@ -15,15 +17,25 @@ def _send_email(to_email, subject, html_content):
         return False
 
     try:
-        resend.api_key = api_key
-        r = resend.Emails.send({
+        data = json.dumps({
             "from": from_email,
             "to": [to_email],
             "subject": subject,
             "html": html_content,
-        })
-        logger.info("Email sent to %s (id: %s)", to_email, r.get("id", "unknown"))
-        return True
+        }).encode("utf-8")
+
+        req = urllib.request.Request(
+            "https://api.resend.com/emails",
+            data=data,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+            logger.info("Email sent to %s (id: %s)", to_email, result.get("id", "unknown"))
+            return True
     except Exception as e:
         logger.error("Failed to send email to %s: %s", to_email, e)
         return False

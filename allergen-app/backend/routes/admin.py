@@ -182,7 +182,7 @@ def list_dishes():
 
 
 @admin_bp.route("/dishes", methods=["POST"])
-@chef_required
+@login_required
 def add_dish():
     data = request.get_json()
     name = data.get("name", "").strip()
@@ -199,6 +199,16 @@ def add_dish():
         return jsonify({"error": "Price must be a number"}), 400
     if price < 0 or price > 9999:
         return jsonify({"error": "Price must be between 0 and 9999"}), 400
+
+    # FOH can only add drinks
+    if current_user.role == "foh":
+        menu_id = _resolve_menu_id(data)
+        if menu_id:
+            menu = Menu.query.get(menu_id)
+            if not menu or menu.slug != "drinks":
+                return jsonify({"error": "FOH can only add drinks menu items"}), 403
+        else:
+            return jsonify({"error": "FOH must specify the drinks menu"}), 403
 
     category = data.get("category", "Mains")
     is_special = data.get("is_special", False)
@@ -241,10 +251,15 @@ def add_dish():
 
 
 @admin_bp.route("/dishes/<int:dish_id>", methods=["PUT"])
-@chef_required
+@login_required
 def edit_dish(dish_id):
     dish = MenuItem.query.get_or_404(dish_id)
     data = request.get_json()
+
+    # FOH can only edit drinks
+    if current_user.role == "foh":
+        if not dish.menu or dish.menu.slug != "drinks":
+            return jsonify({"error": "FOH can only edit drinks menu items"}), 403
 
     updated_name = data.get("name", dish.name).strip()
     if not updated_name or len(updated_name) > 200:
@@ -881,4 +896,58 @@ def get_analytics():
             "active": active_items,
         },
         "orders_by_hour": orders_by_hour,
+    })
+
+
+# ── Allergy Matrix ──────────────────────────────────────────
+
+@admin_bp.route("/allergy-matrix", methods=["POST"])
+@login_required
+def allergy_matrix():
+    """Given a list of allergens, return safe and unsafe dishes."""
+    data = request.get_json()
+    allergen_names = data.get("allergens", [])
+    menu_slug = data.get("menu_slug")  # optional filter
+
+    query = MenuItem.query.filter_by(active=True)
+    if menu_slug:
+        menu = Menu.query.filter_by(slug=menu_slug).first()
+        if menu:
+            query = query.filter_by(menu_id=menu.id)
+
+    dishes = query.order_by(MenuItem.id).all()
+
+    safe = []
+    unsafe = []
+    for dish in dishes:
+        dish_allergens = set()
+        for ma in dish.allergens:
+            if ma.allergen:
+                dish_allergens.add(ma.allergen.name)
+
+        conflicts = [a for a in allergen_names if a in dish_allergens]
+
+        dish_data = {
+            "id": dish.id,
+            "name": dish.name,
+            "description": dish.description,
+            "price": dish.price,
+            "category": dish.category,
+            "menu_name": dish.menu.name if dish.menu else None,
+            "allergens": list(dish_allergens),
+            "conflicts": conflicts,
+            "dietary_labels": dish.dietary_labels,
+        }
+
+        if conflicts:
+            unsafe.append(dish_data)
+        else:
+            safe.append(dish_data)
+
+    return jsonify({
+        "selected_allergens": allergen_names,
+        "safe_count": len(safe),
+        "unsafe_count": len(unsafe),
+        "safe": safe,
+        "unsafe": unsafe,
     })
