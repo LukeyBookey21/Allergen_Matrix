@@ -68,6 +68,17 @@ def get_menu():
             "dietary_labels": dish.dietary_labels,
         }
         result.append(dish_data)
+
+    dietary = request.args.get("dietary")  # e.g. "V,VG"
+    if dietary:
+        required_labels = [l.strip() for l in dietary.split(",") if l.strip()]
+        filtered = []
+        for dish_data in result:
+            dish_labels = [l.strip() for l in (dish_data.get("dietary_labels", "") or "").split(",") if l.strip()]
+            if all(label in dish_labels for label in required_labels):
+                filtered.append(dish_data)
+        result = filtered
+
     return jsonify(result)
 
 
@@ -98,6 +109,12 @@ def create_order():
 
     if not table_number or len(table_number) > 20:
         return jsonify({"error": "Table number is required and must be 1-20 characters"}), 400
+    if len(customer_name) > 100:
+        return jsonify({"error": "Customer name must be 100 characters or fewer"}), 400
+    if len(customer_email) > 200:
+        return jsonify({"error": "Customer email must be 200 characters or fewer"}), 400
+    if len(notes) > 500:
+        return jsonify({"error": "Notes must be 500 characters or fewer"}), 400
     if not isinstance(items, list) or not items:
         return jsonify({"error": "Order must have a non-empty list of items"}), 400
 
@@ -109,6 +126,9 @@ def create_order():
             return jsonify({"error": "Each item must have a valid menu_item_id"}), 400
         if not isinstance(quantity, int) or quantity < 1 or quantity > 99:
             return jsonify({"error": "Quantity must be an integer between 1 and 99"}), 400
+        item_notes = item.get("notes", "")
+        if isinstance(item_notes, str) and len(item_notes) > 300:
+            return jsonify({"error": "Item notes must be 300 characters or fewer"}), 400
         menu_item = MenuItem.query.get(menu_item_id)
         if not menu_item or not menu_item.active:
             return jsonify({"error": f"Item '{menu_item_id}' is not available"}), 400
@@ -155,7 +175,7 @@ def create_order():
         "id": order.id,
         "table_number": order.table_number,
         "customer_name": order.customer_name,
-        "customer_email": order.customer_email,
+        "lookup_token": order.lookup_token,
         "notes": order.notes,
         "status": order.status,
         "items": order_items,
@@ -167,7 +187,10 @@ def create_order():
 @public_bp.route("/orders/<int:order_id>", methods=["GET"])
 def get_order_status(order_id):
     """Customer can check their order status."""
+    token = request.args.get("token", "")
     order = Order.query.get_or_404(order_id)
+    if not token or order.lookup_token != token:
+        return jsonify({"error": "Not found"}), 404
     order_items = []
     total = 0.0
     for oi in order.items:
@@ -230,7 +253,7 @@ def get_dish_options(dish_id):
 def _generate_reference():
     """Generate a unique pre-order reference like PO-A3K9."""
     while True:
-        ref = "PO-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        ref = "PO-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
         if not PreOrder.query.filter_by(reference=ref).first():
             return ref
 
@@ -252,6 +275,14 @@ def create_pre_order():
     # Validation
     if not contact_name or not email or not booking_date or not booking_time:
         return jsonify({"error": "Contact name, email, date and time are required"}), 400
+    if len(contact_name) > 100:
+        return jsonify({"error": "Contact name must be 100 characters or fewer"}), 400
+    if len(email) > 200:
+        return jsonify({"error": "Email must be 200 characters or fewer"}), 400
+    if len(phone) > 30:
+        return jsonify({"error": "Phone must be 30 characters or fewer"}), 400
+    if len(special_notes) > 1000:
+        return jsonify({"error": "Special notes must be 1000 characters or fewer"}), 400
     if not isinstance(party_size, int) or party_size < 8 or party_size > 50:
         return jsonify({"error": "Party size must be between 8 and 50"}), 400
     if not isinstance(guests, list) or len(guests) == 0:
@@ -275,9 +306,12 @@ def create_pre_order():
     db.session.flush()
 
     for i, guest_data in enumerate(guests):
+        guest_name = guest_data.get("name", f"Guest {i+1}").strip()
+        if len(guest_name) > 100:
+            return jsonify({"error": f"Guest name must be 100 characters or fewer (guest {i+1})"}), 400
         guest = PreOrderGuest(
             pre_order_id=pre_order.id,
-            guest_name=guest_data.get("name", f"Guest {i+1}").strip(),
+            guest_name=guest_name,
             position=i + 1,
             dietary_notes=guest_data.get("dietary_notes", ""),
             allergen_names=",".join(guest_data.get("allergens", [])),

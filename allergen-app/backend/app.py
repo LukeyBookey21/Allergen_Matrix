@@ -67,7 +67,7 @@ def create_app():
         # Create admin user if not exists
         admin_email = app.config["ADMIN_EMAIL"]
         admin_password = app.config["ADMIN_PASSWORD"]
-        if not AdminUser.query.filter_by(email=admin_email).first():
+        if admin_password and not AdminUser.query.filter_by(email=admin_email).first():
             admin = AdminUser(
                 email=admin_email,
                 password=generate_password_hash(admin_password),
@@ -78,8 +78,8 @@ def create_app():
 
         # Create FOH user if not exists
         foh_email = os.environ.get("FOH_EMAIL", "foh@restaurant.com")
-        foh_password = os.environ.get("FOH_PASSWORD", app.config["ADMIN_PASSWORD"])
-        if not AdminUser.query.filter_by(email=foh_email).first():
+        foh_password = os.environ.get("FOH_PASSWORD", "")
+        if foh_password and not AdminUser.query.filter_by(email=foh_email).first():
             foh = AdminUser(
                 email=foh_email,
                 password=generate_password_hash(foh_password),

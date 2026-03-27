@@ -1,3 +1,5 @@
+import secrets
+
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 
@@ -75,6 +77,7 @@ class Order(db.Model):
     customer_name = db.Column(db.String(100), default="")
     customer_email = db.Column(db.String(200), default="")
     notes = db.Column(db.Text, default="")
+    lookup_token = db.Column(db.String(64), default=lambda: secrets.token_hex(16))
     status = db.Column(db.String(30), default="pending")  # pending, confirmed, preparing, ready, served, cancelled
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())

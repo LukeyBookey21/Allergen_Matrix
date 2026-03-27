@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus, getAdminPreOrders, updatePreOrderStatus, getAnalytics, getAllergyMatrix } from "../api";
+import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus, getAdminPreOrders, updatePreOrderStatus, getAnalytics, getAllergyMatrix, getAdminPairings, createAdminPairing, deleteAdminPairing } from "../api";
 import AllergenBadge from "../components/AllergenBadge";
 
 export default function AdminDashboard() {
@@ -27,6 +27,12 @@ export default function AdminDashboard() {
   const [matrixMenuSlug, setMatrixMenuSlug] = useState("");
   const [matrixResult, setMatrixResult] = useState(null);
   const [matrixLoading, setMatrixLoading] = useState(false);
+  const [showPairings, setShowPairings] = useState(false);
+  const [pairings, setPairings] = useState([]);
+  const [pairingFood, setPairingFood] = useState("");
+  const [pairingDrink, setPairingDrink] = useState("");
+  const [pairingNote, setPairingNote] = useState("");
+  const [pairingsLoading, setPairingsLoading] = useState(false);
   const ordersInterval = useRef(null);
   const previousOrderCount = useRef(0);
   const preOrdersInterval = useRef(null);
@@ -753,6 +759,123 @@ export default function AdminDashboard() {
               })}
             </div>
           </>
+        )}
+        {/* Pairings Management - Chef only */}
+        {userRole !== "foh" && (
+          <div className="mt-6">
+            <button
+              onClick={async () => {
+                const next = !showPairings;
+                setShowPairings(next);
+                if (next) {
+                  setPairingsLoading(true);
+                  const data = await getAdminPairings();
+                  setPairings(data || []);
+                  setPairingsLoading(false);
+                }
+              }}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${showPairings ? "rotate-90" : ""}`} viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+              </svg>
+              Manage Pairings
+            </button>
+            {showPairings && (
+              <div className="mt-3 bg-white rounded-2xl border border-stone-100 shadow-sm p-5">
+                {pairingsLoading ? (
+                  <p className="text-sm text-slate-400">Loading pairings...</p>
+                ) : (
+                  <>
+                    {pairings.length === 0 ? (
+                      <p className="text-sm text-slate-400 mb-4">No pairings yet.</p>
+                    ) : (
+                      <div className="divide-y divide-stone-100 mb-4">
+                        {pairings.map(p => (
+                          <div key={p.id} className="flex items-center justify-between py-2">
+                            <span className="text-sm text-slate-700">
+                              {p.food_item_name || `Item #${p.food_item_id}`} &rarr; {p.drink_item_name || `Item #${p.drink_item_id}`}
+                              {p.note && <span className="text-slate-400 ml-2">({p.note})</span>}
+                            </span>
+                            <button
+                              onClick={async () => {
+                                await deleteAdminPairing(p.id);
+                                setPairings(prev => prev.filter(x => x.id !== p.id));
+                              }}
+                              className="text-xs text-red-500 hover:text-red-700 font-medium"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex flex-col sm:flex-row gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">Food Item</label>
+                        <select
+                          value={pairingFood}
+                          onChange={e => setPairingFood(e.target.value)}
+                          className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        >
+                          <option value="">Select food...</option>
+                          {dishes.filter(d => {
+                            const drinkCats = ["Wine", "Beer", "Cocktails", "Soft Drinks", "Hot Drinks"];
+                            return !drinkCats.includes(d.category);
+                          }).map(d => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">Drink Item</label>
+                        <select
+                          value={pairingDrink}
+                          onChange={e => setPairingDrink(e.target.value)}
+                          className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        >
+                          <option value="">Select drink...</option>
+                          {dishes.filter(d => {
+                            const drinkCats = ["Wine", "Beer", "Cocktails", "Soft Drinks", "Hot Drinks"];
+                            return drinkCats.includes(d.category);
+                          }).map(d => (
+                            <option key={d.id} value={d.id}>{d.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex-1">
+                        <label className="text-xs font-medium text-slate-500 mb-1 block">Note</label>
+                        <input
+                          type="text"
+                          value={pairingNote}
+                          onChange={e => setPairingNote(e.target.value)}
+                          placeholder="e.g. Bold red to match the steak"
+                          className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        />
+                      </div>
+                      <button
+                        onClick={async () => {
+                          if (!pairingFood || !pairingDrink) return;
+                          const result = await createAdminPairing(Number(pairingFood), Number(pairingDrink), pairingNote);
+                          if (result) {
+                            const data = await getAdminPairings();
+                            setPairings(data || []);
+                            setPairingFood("");
+                            setPairingDrink("");
+                            setPairingNote("");
+                          }
+                        }}
+                        disabled={!pairingFood || !pairingDrink}
+                        className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                      >
+                        Add Pairing
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         )}
         </>
         )}

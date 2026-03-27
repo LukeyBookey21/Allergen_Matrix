@@ -301,6 +301,39 @@ export async function updatePreOrderStatus(id, status) {
   } catch { return null; }
 }
 
+export async function getAdminPairings() {
+  try {
+    const res = await apiFetch("/admin/pairings");
+    if (!res) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function createAdminPairing(foodId, drinkId, note) {
+  try {
+    const res = await apiFetch("/admin/pairings", {
+      method: "POST",
+      body: JSON.stringify({ food_item_id: foodId, drink_item_id: drinkId, note }),
+    });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteAdminPairing(id) {
+  try {
+    const res = await apiFetch(`/admin/pairings/${id}`, { method: "DELETE" });
+    if (!res) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function getAnalytics() {
   try {
     const res = await apiFetch("/admin/analytics");

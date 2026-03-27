@@ -177,17 +177,17 @@ export default function CustomerMenu() {
       throw new Error(result.error);
     }
     if (result.id) {
-      setOrderPlaced({ ...result, tableNumber, items: cart });
+      setOrderPlaced({ ...result, tableNumber, items: cart, lookup_token: result.lookup_token });
       setCart([]);
       setCartOpen(false);
     }
   }
 
-  async function startTracking(orderId) {
+  async function startTracking(orderId, token) {
     setTrackingOrder(null);
     const fetchStatus = async () => {
       try {
-        const res = await fetch(`/api/orders/${orderId}`);
+        const res = await fetch(`/api/orders/${orderId}?token=${token}`);
         if (res.ok) setTrackingOrder(await res.json());
       } catch {}
     };
@@ -221,13 +221,13 @@ export default function CustomerMenu() {
   // Filter dishes
   const filteredDishes = dishes.filter((dish) => {
     if (!dish.active && dish.active !== undefined) return false;
-    if (mode === "hide") {
-      const dishAllergenNames = dish.allergens ? dish.allergens.map((a) => a.name) : [];
+    if (mode === "hide" && selectedAllergens.length > 0) {
+      const dishAllergenNames = (dish.allergens || []).map((a) => a.name);
       if (selectedAllergens.some((a) => dishAllergenNames.includes(a))) return false;
     }
     // dietary filter
     if (dietaryFilters.length > 0) {
-      const dishLabels = (dish.dietary_labels || "").split(",").map(l => l.trim());
+      const dishLabels = (dish.dietary_labels || "").split(",").map(l => l.trim()).filter(Boolean);
       if (!dietaryFilters.every(f => dishLabels.includes(f))) return false;
     }
     return true;
@@ -563,7 +563,7 @@ export default function CustomerMenu() {
             <div className="flex gap-2 justify-center">
               <button
                 onClick={() => {
-                  startTracking(orderPlaced.id);
+                  startTracking(orderPlaced.id, orderPlaced.lookup_token);
                   setOrderPlaced(null);
                 }}
                 className="bg-slate-800 text-white px-5 py-2 rounded-xl font-semibold hover:bg-slate-700 transition-colors text-sm"
