@@ -73,6 +73,7 @@ class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     table_number = db.Column(db.String(20), nullable=False)
     customer_name = db.Column(db.String(100), default="")
+    customer_email = db.Column(db.String(200), default="")
     notes = db.Column(db.Text, default="")
     status = db.Column(db.String(30), default="pending")  # pending, confirmed, preparing, ready, served, cancelled
     created_at = db.Column(db.DateTime, default=db.func.now())

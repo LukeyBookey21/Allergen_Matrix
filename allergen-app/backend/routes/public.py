@@ -92,6 +92,7 @@ def create_order():
     data = request.get_json()
     table_number = data.get("table_number", "").strip()
     customer_name = data.get("customer_name", "").strip()
+    customer_email = data.get("customer_email", "").strip()
     notes = data.get("notes", "").strip()
     items = data.get("items", [])
 
@@ -112,7 +113,7 @@ def create_order():
         if not menu_item or not menu_item.active:
             return jsonify({"error": f"Item '{menu_item_id}' is not available"}), 400
 
-    order = Order(table_number=table_number, customer_name=customer_name, notes=notes)
+    order = Order(table_number=table_number, customer_name=customer_name, customer_email=customer_email, notes=notes)
     db.session.add(order)
     db.session.flush()
 
@@ -141,10 +142,12 @@ def create_order():
             "notes": oi.notes,
         })
 
-    # Send admin notification
+    # Send emails
     try:
-        from email_service import send_order_admin_notification
+        from email_service import send_order_admin_notification, send_order_customer_receipt
         send_order_admin_notification(order, order_items, total)
+        if customer_email:
+            send_order_customer_receipt(order, order_items, total)
     except Exception as e:
         logger.warning("Email sending failed for order %s: %s", order.id, e)
 
@@ -152,6 +155,7 @@ def create_order():
         "id": order.id,
         "table_number": order.table_number,
         "customer_name": order.customer_name,
+        "customer_email": order.customer_email,
         "notes": order.notes,
         "status": order.status,
         "items": order_items,

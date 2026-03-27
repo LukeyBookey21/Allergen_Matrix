@@ -3,6 +3,7 @@ import { useState } from "react";
 export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUpdateNotes, onClose, onCheckout, isOpen, pairingsMap = {}, onAddToCart }) {
   const [tableNumber, setTableNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -15,9 +16,10 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
     setError("");
     setSubmitting(true);
     try {
-      await onCheckout(tableNumber.trim(), customerName.trim(), orderNotes.trim());
+      await onCheckout(tableNumber.trim(), customerName.trim(), customerEmail.trim(), orderNotes.trim());
       setTableNumber("");
       setCustomerName("");
+      setCustomerEmail("");
       setOrderNotes("");
     } catch (err) {
       setError(err?.message || "Something went wrong. Please try again.");
@@ -192,7 +194,7 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
               className="w-full text-sm text-slate-600 placeholder-slate-300 bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent resize-none"
             />
 
-            {/* Table number and name */}
+            {/* Table number, name, email */}
             <div className="flex gap-2">
               <div className="flex-1">
                 <input
@@ -215,6 +217,15 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
                 />
               </div>
             </div>
+
+            {/* Email for receipt */}
+            <input
+              type="email"
+              placeholder="Email for receipt (optional)"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              className="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent"
+            />
 
             {/* Error message */}
             {error && (

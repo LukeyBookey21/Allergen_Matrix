@@ -188,11 +188,102 @@ def send_pre_order_admin_notification(pre_order):
     )
 
 
-def send_order_confirmation(order, order_items, total):
-    """Send confirmation for a regular table order (if customer provided email via name field)."""
-    # Regular orders don't collect email, so this is a no-op for now
-    # Could be used if we add email field to orders in the future
-    pass
+def send_order_customer_receipt(order, order_items, total):
+    """Send receipt/confirmation email to customer for a table order."""
+    if not order.customer_email:
+        return
+
+    restaurant = current_app.config.get("RESTAURANT_NAME", "Curious Kitchen")
+    address = current_app.config.get("RESTAURANT_ADDRESS", "")
+    phone = current_app.config.get("RESTAURANT_PHONE", "")
+    vat_number = current_app.config.get("VAT_NUMBER", "")
+    from datetime import datetime
+
+    # Build items table
+    items_html = ""
+    for item in order_items:
+        line_total = item["price"] * item["quantity"]
+        items_html += f'''
+        <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f1f5f9;color:#334155;font-size:14px;">{item["name"]}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f1f5f9;text-align:center;color:#64748b;font-size:14px;">{item["quantity"]}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f1f5f9;text-align:right;color:#334155;font-size:14px;font-weight:500;">£{line_total:.2f}</td>
+        </tr>'''
+
+    # VAT calculation (UK standard 20%)
+    vat_rate = 0.20
+    net_total = total / (1 + vat_rate)
+    vat_amount = total - net_total
+
+    now = datetime.now()
+
+    html = f'''
+    <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:0 auto;background:#ffffff;">
+        <div style="background:#1e293b;padding:32px;text-align:center;border-radius:12px 12px 0 0;">
+            <h1 style="color:#ffffff;margin:0;font-size:24px;font-family:Georgia,serif;">{restaurant}</h1>
+            <p style="color:#94a3b8;margin:8px 0 0;font-size:13px;">Order Receipt</p>
+        </div>
+
+        <div style="padding:32px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:24px;">
+                <div>
+                    <p style="margin:0;font-size:13px;color:#64748b;">Order #{order.id}</p>
+                    <p style="margin:4px 0 0;font-size:13px;color:#64748b;">Table {order.table_number}</p>
+                    <p style="margin:4px 0 0;font-size:13px;color:#64748b;">{now.strftime("%d %B %Y at %H:%M")}</p>
+                </div>
+            </div>
+
+            {f'<p style="font-size:15px;color:#334155;margin-bottom:20px;">Thank you{", " + order.customer_name if order.customer_name else ""}! Here is your order confirmation.</p>' }
+
+            <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left;padding:8px 0;border-bottom:2px solid #e2e8f0;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;">Item</th>
+                        <th style="text-align:center;padding:8px 0;border-bottom:2px solid #e2e8f0;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;">Qty</th>
+                        <th style="text-align:right;padding:8px 0;border-bottom:2px solid #e2e8f0;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:1px;">Amount</th>
+                    </tr>
+                </thead>
+                <tbody>{items_html}</tbody>
+            </table>
+
+            <div style="border-top:2px solid #1e293b;padding-top:12px;margin-top:8px;">
+                <table style="width:100%;font-size:14px;">
+                    <tr>
+                        <td style="padding:4px 0;color:#64748b;">Subtotal (ex. VAT)</td>
+                        <td style="padding:4px 0;text-align:right;color:#334155;">£{net_total:.2f}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 0;color:#64748b;">VAT (20%)</td>
+                        <td style="padding:4px 0;text-align:right;color:#334155;">£{vat_amount:.2f}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px 0;font-weight:bold;font-size:18px;color:#1e293b;">Total</td>
+                        <td style="padding:8px 0;text-align:right;font-weight:bold;font-size:18px;color:#1e293b;">£{total:.2f}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <div style="background:#f8fafc;border-radius:12px;padding:16px;margin-top:24px;font-size:12px;color:#94a3b8;">
+                <p style="margin:0 0 4px;"><strong style="color:#64748b;">{restaurant}</strong></p>
+                {f'<p style="margin:0 0 2px;">{address}</p>' if address else ''}
+                {f'<p style="margin:0 0 2px;">Tel: {phone}</p>' if phone else ''}
+                {f'<p style="margin:0 0 2px;">VAT No: {vat_number}</p>' if vat_number else ''}
+                <p style="margin:8px 0 0;">Payment to be taken at your table. This email serves as your order confirmation.</p>
+            </div>
+
+            <p style="font-size:11px;color:#cbd5e1;margin-top:24px;text-align:center;">
+                Please inform your server of any allergies or dietary requirements.<br>
+                Allergen information is available on request.
+            </p>
+        </div>
+    </div>
+    '''
+
+    _send_email(
+        order.customer_email,
+        f"Your Order — #{order.id} — {restaurant}",
+        html,
+    )
 
 
 def send_order_admin_notification(order, order_items, total):

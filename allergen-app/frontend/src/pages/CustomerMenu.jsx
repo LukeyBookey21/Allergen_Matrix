@@ -160,10 +160,11 @@ export default function CustomerMenu() {
     ));
   }
 
-  async function handleCheckout(tableNumber, customerName, orderNotes) {
+  async function handleCheckout(tableNumber, customerName, customerEmail, orderNotes) {
     const orderData = {
       table_number: tableNumber,
       customer_name: customerName,
+      customer_email: customerEmail,
       notes: orderNotes,
       items: cart.map(item => ({
         menu_item_id: item.dish.id,
