@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus, getAdminPreOrders, updatePreOrderStatus } from "../api";
+import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus, getAdminPreOrders, updatePreOrderStatus, getAnalytics } from "../api";
 import AllergenBadge from "../components/AllergenBadge";
 
 export default function AdminDashboard() {
@@ -19,6 +19,8 @@ export default function AdminDashboard() {
   const [preOrders, setPreOrders] = useState([]);
   const [preOrdersLoading, setPreOrdersLoading] = useState(false);
   const [expandedPreOrder, setExpandedPreOrder] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const ordersInterval = useRef(null);
   const previousOrderCount = useRef(0);
   const preOrdersInterval = useRef(null);
@@ -110,6 +112,16 @@ export default function AdminDashboard() {
     }
     return () => clearInterval(preOrdersInterval.current);
   }, [activeTab, loadPreOrders]);
+
+  useEffect(() => {
+    if (activeTab === "analytics") {
+      setAnalyticsLoading(true);
+      getAnalytics().then(data => {
+        setAnalytics(data);
+        setAnalyticsLoading(false);
+      });
+    }
+  }, [activeTab]);
 
   async function handleUpdatePreOrderStatus(id, status) {
     try {
@@ -245,6 +257,16 @@ export default function AdminDashboard() {
                 {preOrders.filter(po => po.status === "pending").length}
               </span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab("analytics")}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 ${
+              activeTab === "analytics"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Analytics
           </button>
         </div>
 
@@ -724,23 +746,26 @@ export default function AdminDashboard() {
             ) : (
               <div className="grid gap-4">
                 {orders.map((order) => (
-                  <div key={order.id} className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                  <div key={order.id} className={`bg-white rounded-xl border shadow-sm p-5 ${order.status === "pending" ? "border-amber-300 ring-1 ring-amber-100" : "border-stone-100"}`}>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                       <div className="flex items-center gap-3">
+                        {order.status === "pending" && (
+                          <span className="relative flex h-3 w-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                          </span>
+                        )}
+                        {order.table_number && (
+                          <span className="inline-flex items-center justify-center bg-slate-800 text-white text-sm font-bold rounded-lg px-3 py-1">
+                            T{order.table_number}
+                          </span>
+                        )}
                         <h3 className="font-bold text-slate-800">Order #{order.id}</h3>
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[order.status] || "bg-gray-100 text-gray-500"}`}>
                           {order.status}
                         </span>
                       </div>
                       <div className="flex items-center gap-3 text-sm text-slate-500">
-                        {order.table_number && (
-                          <span className="flex items-center gap-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M5 2a1 1 0 011 1v1h1a1 1 0 010 2H6v1a1 1 0 01-2 0V6H3a1 1 0 010-2h1V3a1 1 0 011-1zm0 10a1 1 0 011 1v1h1a1 1 0 110 2H6v1a1 1 0 11-2 0v-1H3a1 1 0 110-2h1v-1a1 1 0 011-1z" clipRule="evenodd" />
-                            </svg>
-                            Table {order.table_number}
-                          </span>
-                        )}
                         {order.customer_name && (
                           <span>{order.customer_name}</span>
                         )}
@@ -791,6 +816,155 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Analytics Tab */}
+        {activeTab === "analytics" && (
+          <div>
+            {analyticsLoading ? (
+              <div className="text-center py-16">
+                <div className="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-slate-400 text-sm font-medium">Loading analytics...</p>
+              </div>
+            ) : !analytics ? (
+              <div className="text-center py-16 animate-fade-in">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-stone-100 mb-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <p className="text-slate-500 font-medium">Analytics unavailable</p>
+                <p className="text-slate-400 text-sm mt-1">Could not load analytics data. Try again later.</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Key Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
+                    <p className="text-[10px] font-semibold text-blue-400 uppercase tracking-widest mb-1">Today's Orders</p>
+                    <p className="text-3xl font-bold text-blue-700">{analytics.orders?.today ?? 0}</p>
+                  </div>
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-5">
+                    <p className="text-[10px] font-semibold text-green-400 uppercase tracking-widest mb-1">Today's Revenue</p>
+                    <p className="text-3xl font-bold text-green-700">&pound;{analytics.revenue?.today ?? "0.00"}</p>
+                  </div>
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-5">
+                    <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest mb-1">Avg Order Value</p>
+                    <p className="text-3xl font-bold text-emerald-700">&pound;{analytics.revenue?.average_order ?? "0.00"}</p>
+                  </div>
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-5">
+                    <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest mb-1">Upcoming Pre-Orders</p>
+                    <p className="text-3xl font-bold text-amber-700">{analytics.pre_orders?.upcoming ?? 0}</p>
+                  </div>
+                </div>
+
+                {/* Top Dishes + Allergen Trends */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Top 10 Dishes */}
+                  <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Top 10 Dishes</h3>
+                    {analytics.top_dishes && analytics.top_dishes.length > 0 ? (
+                      <div className="space-y-2.5">
+                        {analytics.top_dishes.slice(0, 10).map((dish, idx) => {
+                          const maxCount = analytics.top_dishes[0]?.count || 1;
+                          const barWidth = Math.max((dish.count / maxCount) * 100, 8);
+                          return (
+                            <div key={idx}>
+                              <div className="flex items-center justify-between text-sm mb-1">
+                                <span className="text-slate-700 font-medium">{idx + 1}. {dish.name}</span>
+                                <span className="text-slate-400 text-xs">{dish.count} orders</span>
+                              </div>
+                              <div className="w-full bg-stone-100 rounded-full h-2">
+                                <div
+                                  className="bg-amber-400 h-2 rounded-full transition-all duration-500"
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">No dish data available yet.</p>
+                    )}
+                  </div>
+
+                  {/* Allergen Trends */}
+                  <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                    <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Allergen Trends</h3>
+                    {analytics.allergen_trends && analytics.allergen_trends.length > 0 ? (
+                      <div className="space-y-2.5">
+                        {analytics.allergen_trends.map((allergen, idx) => {
+                          const maxCount = analytics.allergen_trends[0]?.count || 1;
+                          const barWidth = Math.max((allergen.count / maxCount) * 100, 8);
+                          return (
+                            <div key={idx}>
+                              <div className="flex items-center justify-between text-sm mb-1">
+                                <span className="text-slate-700 font-medium">{allergen.name}</span>
+                                <span className="text-slate-400 text-xs">{allergen.count} dishes ordered</span>
+                              </div>
+                              <div className="w-full bg-stone-100 rounded-full h-2">
+                                <div
+                                  className="bg-red-300 h-2 rounded-full transition-all duration-500"
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-400">No allergen data available yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Order Status Breakdown */}
+                <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Order Status Breakdown</h3>
+                  {analytics.orders?.by_status ? (
+                    <div className="flex flex-wrap gap-3">
+                      {Object.entries(analytics.orders.by_status).map(([status, count]) => (
+                        <span
+                          key={status}
+                          className={`px-3 py-1.5 rounded-full text-sm font-semibold capitalize ${STATUS_COLORS[status] || "bg-gray-100 text-gray-500"}`}
+                        >
+                          {count} {status}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">No status data available.</p>
+                  )}
+                </div>
+
+                {/* All Time Stats */}
+                <div className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                  <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">All Time Stats</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Total Orders</p>
+                      <p className="text-xl font-bold text-slate-800">{analytics.orders?.total ?? 0}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Total Revenue</p>
+                      <p className="text-xl font-bold text-slate-800">&pound;{analytics.revenue?.total ?? "0.00"}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Menu Items</p>
+                      <p className="text-xl font-bold text-slate-800">
+                        {analytics.menu_items?.active ?? 0} <span className="text-sm font-normal text-slate-400">/ {analytics.menu_items?.total ?? 0} total</span>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Total Pre-Orders</p>
+                      <p className="text-xl font-bold text-slate-800">{analytics.pre_orders?.total ?? 0}</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

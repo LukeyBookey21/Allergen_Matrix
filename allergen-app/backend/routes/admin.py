@@ -766,3 +766,108 @@ def delete_dish_option(opt_id):
     db.session.delete(opt)
     db.session.commit()
     return jsonify({"message": "Deleted"})
+
+
+# ── Analytics ──────────────────────────────────────────
+
+@admin_bp.route("/analytics", methods=["GET"])
+@login_required
+def get_analytics():
+    """Return analytics data for the dashboard."""
+    from datetime import datetime, timedelta
+    from collections import Counter
+    from sqlalchemy import func
+
+    today = datetime.now().date()
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+
+    # Total orders
+    total_orders = Order.query.count()
+    today_orders = Order.query.filter(func.date(Order.created_at) == today).count()
+    week_orders = Order.query.filter(func.date(Order.created_at) >= week_ago).count()
+
+    # Revenue (sum of item prices * quantities)
+    all_order_items = db.session.query(
+        OrderItem.menu_item_id, OrderItem.quantity
+    ).all()
+
+    total_revenue = 0.0
+    today_revenue = 0.0
+    dish_popularity = Counter()
+
+    # Calculate revenue properly
+    for order in Order.query.all():
+        order_total = 0.0
+        for oi in order.items:
+            if oi.menu_item:
+                item_total = oi.menu_item.price * oi.quantity
+                order_total += item_total
+                dish_popularity[oi.menu_item.name] += oi.quantity
+        total_revenue += order_total
+        if order.created_at and order.created_at.date() == today:
+            today_revenue += order_total
+
+    # Top dishes
+    top_dishes = [{"name": name, "count": count} for name, count in dish_popularity.most_common(10)]
+
+    # Order status breakdown
+    status_counts = {}
+    for status, count in db.session.query(Order.status, func.count(Order.id)).group_by(Order.status).all():
+        status_counts[status] = count
+
+    # Pre-orders stats
+    total_pre_orders = PreOrder.query.count()
+    upcoming_pre_orders = PreOrder.query.filter(
+        PreOrder.booking_date >= today.isoformat(),
+        PreOrder.status.in_(["pending", "confirmed"])
+    ).count()
+
+    # Allergen trends - which allergens appear most in orders
+    allergen_counts = Counter()
+    for order in Order.query.all():
+        for oi in order.items:
+            if oi.menu_item:
+                for ma in oi.menu_item.allergens:
+                    if ma.allergen:
+                        allergen_counts[ma.allergen.name] += oi.quantity
+    top_allergens = [{"name": name, "count": count} for name, count in allergen_counts.most_common(14)]
+
+    # Menu item counts
+    total_items = MenuItem.query.count()
+    active_items = MenuItem.query.filter_by(active=True).count()
+
+    # Average order value
+    avg_order_value = round(total_revenue / total_orders, 2) if total_orders > 0 else 0
+
+    # Orders by hour (for today)
+    orders_by_hour = {}
+    for order in Order.query.filter(func.date(Order.created_at) == today).all():
+        if order.created_at:
+            hour = order.created_at.strftime("%H:00")
+            orders_by_hour[hour] = orders_by_hour.get(hour, 0) + 1
+
+    return jsonify({
+        "orders": {
+            "total": total_orders,
+            "today": today_orders,
+            "this_week": week_orders,
+        },
+        "revenue": {
+            "total": round(total_revenue, 2),
+            "today": round(today_revenue, 2),
+            "average_order": avg_order_value,
+        },
+        "top_dishes": top_dishes,
+        "status_breakdown": status_counts,
+        "pre_orders": {
+            "total": total_pre_orders,
+            "upcoming": upcoming_pre_orders,
+        },
+        "allergen_trends": top_allergens,
+        "menu_items": {
+            "total": total_items,
+            "active": active_items,
+        },
+        "orders_by_hour": orders_by_hour,
+    })

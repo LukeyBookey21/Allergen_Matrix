@@ -300,3 +300,11 @@ export async function updatePreOrderStatus(id, status) {
     return await res.json();
   } catch { return null; }
 }
+
+export async function getAnalytics() {
+  try {
+    const res = await apiFetch("/admin/analytics");
+    if (!res) return null;
+    return await res.json();
+  } catch { return null; }
+}
