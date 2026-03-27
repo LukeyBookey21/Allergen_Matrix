@@ -21,6 +21,8 @@ export default function AdminDashboard() {
   const [expandedPreOrder, setExpandedPreOrder] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [userRole, setUserRole] = useState("chef");
+  const [showAllergenRef, setShowAllergenRef] = useState(false);
   const ordersInterval = useRef(null);
   const previousOrderCount = useRef(0);
   const preOrdersInterval = useRef(null);
@@ -30,6 +32,8 @@ export default function AdminDashboard() {
     async function init() {
       const me = await getMe();
       if (!me) return;
+      setUserRole(me.role || "chef");
+      if (me.role === "foh") setActiveTab("orders");
       const [dishData, menuData] = await Promise.all([
         getAdminDishes(),
         getAdminMenus().catch(() => []),
@@ -197,6 +201,9 @@ export default function AdminDashboard() {
             <span className="hidden sm:inline text-slate-400 text-sm font-medium">
               Admin
             </span>
+            <p className="text-slate-400 text-xs">
+              {userRole === "foh" ? "Front of House" : userRole === "manager" ? "Manager" : "Kitchen"} Dashboard
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Link
@@ -272,6 +279,33 @@ export default function AdminDashboard() {
 
         {activeTab === "menu" && (
         <>
+        {userRole === "foh" && (
+          <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-5 mb-6">
+            <button onClick={() => setShowAllergenRef(!showAllergenRef)} className="flex items-center justify-between w-full">
+              <h3 className="font-semibold text-slate-700 text-sm">Quick Allergen Reference</h3>
+              <span className="text-slate-400 text-sm">{showAllergenRef ? "Hide" : "Show"}</span>
+            </button>
+            {showAllergenRef && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-3">
+                {[
+                  {name: "Celery", emoji: "\u{1F33F}"}, {name: "Gluten", emoji: "\u{1F33E}"},
+                  {name: "Crustaceans", emoji: "\u{1F990}"}, {name: "Eggs", emoji: "\u{1F95A}"},
+                  {name: "Fish", emoji: "\u{1F41F}"}, {name: "Lupin", emoji: "\u{1F338}"},
+                  {name: "Milk", emoji: "\u{1F95B}"}, {name: "Molluscs", emoji: "\u{1F991}"},
+                  {name: "Mustard", emoji: "\u{1F7E1}"}, {name: "Peanuts", emoji: "\u{1F95C}"},
+                  {name: "Sesame", emoji: "\u{1F330}"}, {name: "Soybeans", emoji: "\u{1FAD8}"},
+                  {name: "Sulphites", emoji: "\u{1F377}"}, {name: "Tree Nuts", emoji: "\u{1F333}"},
+                ].map(a => (
+                  <div key={a.name} className="bg-stone-50 rounded-lg p-2 text-center">
+                    <span className="text-lg">{a.emoji}</span>
+                    <p className="text-xs font-medium text-slate-600 mt-1">{a.name}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stats bar */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-white rounded-xl p-4 border border-stone-100 shadow-sm">
@@ -346,6 +380,25 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* FOH Drinks quick filter */}
+        {userRole === "foh" && (
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setCategoryFilter(categoryFilter === "Drinks" ? "All" : "Drinks")}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                categoryFilter === "Drinks"
+                  ? "bg-amber-500 text-white shadow-sm"
+                  : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200"
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M6 3a1 1 0 011-1h.01a1 1 0 010 2H7a1 1 0 01-1-1zm2 3a1 1 0 00-2 0v1a2 2 0 00-2 2v1a2 2 0 00-2 2v.683a3.7 3.7 0 011.055 2.633 1 1 0 001.89.465 3.7 3.7 0 012.11-.648h.09a3.7 3.7 0 012.11.648 1 1 0 001.89-.465A3.7 3.7 0 0114 14.683V14a2 2 0 00-2-2v-1a2 2 0 00-2-2V6z" clipRule="evenodd" />
+              </svg>
+              Drinks
+            </button>
+          </div>
+        )}
+
         {/* Action bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mb-4">
           {/* Search */}
@@ -361,6 +414,7 @@ export default function AdminDashboard() {
               className="w-full pl-9 pr-4 py-2.5 border border-stone-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white"
             />
           </div>
+          {userRole !== "foh" && (
           <Link
             to={`/admin/dishes/new${menuFilter !== "All" ? `?menu=${menuFilter}` : ""}`}
             className="inline-flex items-center justify-center gap-2 bg-amber-500 text-white px-5 py-2.5 rounded-xl hover:bg-amber-600 transition-all duration-200 text-sm font-medium shadow-sm shadow-amber-200 whitespace-nowrap"
@@ -370,6 +424,7 @@ export default function AdminDashboard() {
             </svg>
             Add Dish
           </Link>
+          )}
         </div>
 
         {/* QR Code section */}
@@ -545,6 +600,7 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td className="px-5 py-3.5 text-right">
+                          {userRole !== "foh" && (
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Link
                               to={`/admin/dishes/${dish.id}/edit`}
@@ -565,6 +621,7 @@ export default function AdminDashboard() {
                               </svg>
                             </button>
                           </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -644,6 +701,7 @@ export default function AdminDashboard() {
                       >
                         <span className={`toggle-dot ${dish.active ? "translate-x-5" : "translate-x-1"}`} />
                       </button>
+                      {userRole !== "foh" && (
                       <div className="flex gap-2">
                         <Link
                           to={`/admin/dishes/${dish.id}/edit`}
@@ -658,6 +716,7 @@ export default function AdminDashboard() {
                           Delete
                         </button>
                       </div>
+                      )}
                     </div>
                   </div>
                 );

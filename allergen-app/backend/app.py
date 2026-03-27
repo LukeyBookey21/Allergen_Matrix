@@ -71,8 +71,21 @@ def create_app():
             admin = AdminUser(
                 email=admin_email,
                 password=generate_password_hash(admin_password),
+                role="chef",
             )
             db.session.add(admin)
+            db.session.commit()
+
+        # Create FOH user if not exists
+        foh_email = os.environ.get("FOH_EMAIL", "foh@restaurant.com")
+        foh_password = os.environ.get("FOH_PASSWORD", app.config["ADMIN_PASSWORD"])
+        if not AdminUser.query.filter_by(email=foh_email).first():
+            foh = AdminUser(
+                email=foh_email,
+                password=generate_password_hash(foh_password),
+                role="foh",
+            )
+            db.session.add(foh)
             db.session.commit()
 
     return app

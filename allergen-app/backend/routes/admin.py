@@ -1,4 +1,5 @@
 import re
+from functools import wraps
 
 from flask import Blueprint, request, jsonify, current_app
 from flask_login import login_user, logout_user, login_required, current_user
@@ -13,6 +14,16 @@ from parser import parse_and_detect
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
+def chef_required(f):
+    @wraps(f)
+    @login_required
+    def decorated(*args, **kwargs):
+        if current_user.role not in ("chef", "manager"):
+            return jsonify({"error": "Chef access required"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
 @admin_bp.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -22,7 +33,7 @@ def login():
     user = AdminUser.query.filter_by(email=email).first()
     if user and check_password_hash(user.password, password):
         login_user(user)
-        return jsonify({"message": "Logged in", "email": user.email})
+        return jsonify({"message": "Logged in", "email": user.email, "role": user.role})
     return jsonify({"error": "Invalid credentials"}), 401
 
 
@@ -36,7 +47,7 @@ def logout():
 @admin_bp.route("/me", methods=["GET"])
 @login_required
 def me():
-    return jsonify({"email": current_user.email})
+    return jsonify({"email": current_user.email, "role": current_user.role or "chef"})
 
 
 # ── Menu CRUD ──────────────────────────────────────────
@@ -60,7 +71,7 @@ def list_menus():
 
 
 @admin_bp.route("/menus", methods=["POST"])
-@login_required
+@chef_required
 def create_menu():
     data = request.get_json()
     name = data.get("name", "").strip()
@@ -87,7 +98,7 @@ def create_menu():
 
 
 @admin_bp.route("/menus/<int:menu_id>", methods=["PUT"])
-@login_required
+@chef_required
 def update_menu(menu_id):
     menu = Menu.query.get_or_404(menu_id)
     data = request.get_json()
@@ -111,7 +122,7 @@ def update_menu(menu_id):
 
 
 @admin_bp.route("/menus/<int:menu_id>", methods=["DELETE"])
-@login_required
+@chef_required
 def delete_menu(menu_id):
     menu = Menu.query.get_or_404(menu_id)
     db.session.delete(menu)
@@ -171,7 +182,7 @@ def list_dishes():
 
 
 @admin_bp.route("/dishes", methods=["POST"])
-@login_required
+@chef_required
 def add_dish():
     data = request.get_json()
     name = data.get("name", "").strip()
@@ -230,7 +241,7 @@ def add_dish():
 
 
 @admin_bp.route("/dishes/<int:dish_id>", methods=["PUT"])
-@login_required
+@chef_required
 def edit_dish(dish_id):
     dish = MenuItem.query.get_or_404(dish_id)
     data = request.get_json()
@@ -301,7 +312,7 @@ def edit_dish(dish_id):
 
 
 @admin_bp.route("/dishes/<int:dish_id>", methods=["DELETE"])
-@login_required
+@chef_required
 def delete_dish(dish_id):
     dish = MenuItem.query.get_or_404(dish_id)
     db.session.delete(dish)
@@ -328,7 +339,7 @@ def toggle_special(dish_id):
 
 
 @admin_bp.route("/dishes/<int:dish_id>/override-allergens", methods=["POST"])
-@login_required
+@chef_required
 def override_allergens(dish_id):
     dish = MenuItem.query.get_or_404(dish_id)
     data = request.get_json()
@@ -360,7 +371,7 @@ def get_categories():
 
 
 @admin_bp.route("/detect-allergens", methods=["POST"])
-@login_required
+@chef_required
 def detect_allergens():
     data = request.get_json()
     ingredients_text = data.get("ingredients", "")
@@ -423,7 +434,7 @@ def update_order_status(order_id):
 # ── Pairings ──────────────────────────────────────────
 
 @admin_bp.route("/pairings", methods=["GET"])
-@login_required
+@chef_required
 def list_pairings():
     pairings = Pairing.query.all()
     result = []
@@ -441,7 +452,7 @@ def list_pairings():
     return jsonify(result)
 
 @admin_bp.route("/pairings", methods=["POST"])
-@login_required
+@chef_required
 def create_pairing():
     data = request.get_json()
     food_item_id = data.get("food_item_id")
@@ -455,7 +466,7 @@ def create_pairing():
     return jsonify({"id": p.id, "message": "Pairing created"}), 201
 
 @admin_bp.route("/pairings/<int:pairing_id>", methods=["DELETE"])
-@login_required
+@chef_required
 def delete_pairing(pairing_id):
     p = Pairing.query.get_or_404(pairing_id)
     db.session.delete(p)
@@ -730,7 +741,7 @@ def download_placecards(po_id):
 # ── Dish Options ──────────────────────────────────────────
 
 @admin_bp.route("/dish-options", methods=["GET"])
-@login_required
+@chef_required
 def list_dish_options():
     options = DishOption.query.all()
     return jsonify([{
@@ -744,7 +755,7 @@ def list_dish_options():
     } for o in options])
 
 @admin_bp.route("/dish-options", methods=["POST"])
-@login_required
+@chef_required
 def create_dish_option():
     data = request.get_json()
     opt = DishOption(
@@ -760,7 +771,7 @@ def create_dish_option():
     return jsonify({"id": opt.id}), 201
 
 @admin_bp.route("/dish-options/<int:opt_id>", methods=["DELETE"])
-@login_required
+@chef_required
 def delete_dish_option(opt_id):
     opt = DishOption.query.get_or_404(opt_id)
     db.session.delete(opt)
