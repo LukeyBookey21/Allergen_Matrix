@@ -15,7 +15,7 @@ class Config:
     RESTAURANT_ADDRESS = "Thorpe Park Hotel & Spa, 1150 Century Way, Leeds LS15 8ZB"
     RESTAURANT_PHONE = "0113 264 1000"
     VAT_NUMBER = os.environ.get("VAT_NUMBER", "GB 123 4567 89")
-    FROM_EMAIL = os.environ.get("FROM_EMAIL", "noreply@curiouskitchen.com")
+    FROM_EMAIL = os.environ.get("FROM_EMAIL", "orders@hospohub.co.uk")
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
     PERMANENT_SESSION_LIFETIME = 3600  # 1 hour
