@@ -104,7 +104,7 @@ export default function PreOrder() {
         setDrinksDishes(drinks);
         setTableDrinks(drinks.filter((d) => {
           const cat = (d.category || "").toLowerCase();
-          return cat.includes("wine") || cat.includes("prosecco") || cat.includes("champagne") || cat.includes("sparkling");
+          return cat === "bottles";
         }).map((d) => ({ ...d, qty: 0 })));
       }
       if (allergenData) setAllergenList(allergenData);
@@ -574,19 +574,19 @@ export default function PreOrder() {
                   {dishOpts.length > 0 && (
                     <div className="mt-2 ml-2 space-y-2">
                       {dishOpts.map((opt) => (
-                        <div key={opt.id || opt.name}>
+                        <div key={opt.group}>
                           <label className="block text-xs font-medium text-slate-500 mb-1">
-                            {opt.name}
+                            {opt.group}
                           </label>
                           <select
-                            value={courseData?.customisations?.[opt.name] || ""}
-                            onChange={(e) => updateCourseCustomisation(courseIdx, opt.name, e.target.value)}
+                            value={courseData?.customisations?.[opt.group] || ""}
+                            onChange={(e) => updateCourseCustomisation(courseIdx, opt.group, e.target.value)}
                             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-amber-300"
                           >
                             <option value="">None</option>
-                            {(opt.choices || []).map((ch) => (
-                              <option key={ch} value={ch}>
-                                {ch}
+                            {(opt.options || []).map((o) => (
+                              <option key={o.id} value={o.name}>
+                                {o.name}
                               </option>
                             ))}
                           </select>

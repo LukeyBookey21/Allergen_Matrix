@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus } from "../api";
+import { getMe, getAdminDishes, getAdminMenus, deleteDish, toggleDish, toggleSpecial, logout, getAdminOrders, updateOrderStatus, getAdminPreOrders, updatePreOrderStatus } from "../api";
 import AllergenBadge from "../components/AllergenBadge";
 
 export default function AdminDashboard() {
@@ -16,8 +16,12 @@ export default function AdminDashboard() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderStatusFilter, setOrderStatusFilter] = useState("");
   const [orderStatusError, setOrderStatusError] = useState("");
+  const [preOrders, setPreOrders] = useState([]);
+  const [preOrdersLoading, setPreOrdersLoading] = useState(false);
+  const [expandedPreOrder, setExpandedPreOrder] = useState(null);
   const ordersInterval = useRef(null);
   const previousOrderCount = useRef(0);
+  const preOrdersInterval = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -87,6 +91,36 @@ export default function AdminDashboard() {
     }
     return () => clearInterval(ordersInterval.current);
   }, [activeTab, loadOrders]);
+
+  const loadPreOrders = useCallback(async () => {
+    try {
+      const data = await getAdminPreOrders();
+      if (data) setPreOrders(data);
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "preorders") {
+      setPreOrdersLoading(true);
+      loadPreOrders().finally(() => setPreOrdersLoading(false));
+      preOrdersInterval.current = setInterval(loadPreOrders, 30000);
+      return () => clearInterval(preOrdersInterval.current);
+    }
+    return () => clearInterval(preOrdersInterval.current);
+  }, [activeTab, loadPreOrders]);
+
+  async function handleUpdatePreOrderStatus(id, status) {
+    try {
+      const result = await updatePreOrderStatus(id, status);
+      if (result) {
+        setPreOrders(prev => prev.map(po => po.id === id ? { ...po, status } : po));
+      }
+    } catch {
+      // silently fail
+    }
+  }
 
   async function handleUpdateOrderStatus(orderId, status) {
     setOrderStatusError("");
@@ -194,6 +228,21 @@ export default function AdminDashboard() {
             {orders.filter(o => o.status === "pending").length > 0 && (
               <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
                 {orders.filter(o => o.status === "pending").length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("preorders")}
+            className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 flex items-center gap-2 ${
+              activeTab === "preorders"
+                ? "bg-white text-slate-800 shadow-sm"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Pre-Orders
+            {preOrders.filter(po => po.status === "pending").length > 0 && (
+              <span className="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-pulse">
+                {preOrders.filter(po => po.status === "pending").length}
               </span>
             )}
           </button>
@@ -736,6 +785,159 @@ export default function AdminDashboard() {
                         className="text-sm border border-stone-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent bg-white capitalize"
                       >
                         {STATUS_OPTIONS.map((s) => (
+                          <option key={s} value={s} className="capitalize">{s}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pre-Orders Tab */}
+        {activeTab === "preorders" && (
+          <div>
+            {/* Refresh button */}
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-slate-400">
+                {preOrders.length} {preOrders.length === 1 ? "pre-order" : "pre-orders"}
+              </p>
+              <button
+                onClick={() => { setPreOrdersLoading(true); loadPreOrders().finally(() => setPreOrdersLoading(false)); }}
+                className="text-sm text-slate-500 hover:text-slate-700 flex items-center gap-1.5 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${preOrdersLoading ? "animate-spin" : ""}`} viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                </svg>
+                Refresh
+              </button>
+            </div>
+
+            {preOrdersLoading && preOrders.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
+                <p className="text-slate-400 text-sm font-medium">Loading pre-orders...</p>
+              </div>
+            ) : preOrders.length === 0 ? (
+              <div className="text-center py-16 animate-fade-in">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-stone-100 mb-3">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                </div>
+                <p className="text-slate-500 font-medium">No pre-orders found</p>
+                <p className="text-slate-400 text-sm mt-1">Pre-orders will appear here when customers submit them.</p>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {preOrders.map((po) => (
+                  <div key={po.id} className="bg-white rounded-xl border border-stone-100 shadow-sm p-5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-bold text-slate-800">{po.reference || `PO-${po.id}`}</h3>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[po.status] || "bg-gray-100 text-gray-500"}`}>
+                          {po.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-slate-500">
+                        {po.booking_date && (
+                          <span>{po.booking_date}</span>
+                        )}
+                        {po.booking_time && (
+                          <span>{po.booking_time}</span>
+                        )}
+                        {po.party_size && (
+                          <span className="flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                            </svg>
+                            {po.party_size} guests
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Contact info */}
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500 mb-3">
+                      {po.contact_name && (
+                        <span className="font-medium text-slate-700">{po.contact_name}</span>
+                      )}
+                      {po.contact_email && (
+                        <span className="text-slate-400">{po.contact_email}</span>
+                      )}
+                    </div>
+
+                    {/* Download links */}
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      <a
+                        href={`/admin/pre-orders/${po.id}/kitchen-sheet`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-stone-50 hover:bg-stone-100 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        Kitchen Sheet
+                      </a>
+                      <a
+                        href={`/admin/pre-orders/${po.id}/placecards`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 bg-stone-50 hover:bg-stone-100 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                        Place Cards
+                      </a>
+                    </div>
+
+                    {/* Expandable guest details */}
+                    <button
+                      onClick={() => setExpandedPreOrder(expandedPreOrder === po.id ? null : po.id)}
+                      className="text-xs text-amber-600 hover:text-amber-700 font-medium mb-2 transition-colors"
+                    >
+                      {expandedPreOrder === po.id ? "Hide guest details" : "Show guest details"}
+                    </button>
+
+                    {expandedPreOrder === po.id && Array.isArray(po.guests) && (
+                      <div className="bg-stone-50 rounded-lg p-3 mb-3">
+                        <div className="space-y-3">
+                          {po.guests.map((guest, gIdx) => (
+                            <div key={gIdx} className="border-b border-stone-200 pb-2 last:border-0 last:pb-0">
+                              <p className="text-sm font-medium text-slate-700 mb-1">
+                                {guest.name || `Guest ${gIdx + 1}`}
+                                {guest.allergens && guest.allergens.length > 0 && (
+                                  <span className="ml-2 text-xs text-red-500 font-normal">
+                                    Allergens: {Array.isArray(guest.allergens) ? guest.allergens.join(", ") : guest.allergens}
+                                  </span>
+                                )}
+                              </p>
+                              {Array.isArray(guest.courses) && guest.courses.map((course, cIdx) => (
+                                <div key={cIdx} className="flex items-center gap-2 text-sm text-slate-600 ml-2">
+                                  <span className="text-xs text-slate-400 font-medium capitalize">{course.course || course.label}:</span>
+                                  <span>{course.dish_name || course.name || "---"}</span>
+                                  {course.notes && <span className="text-xs text-slate-400 italic">({course.notes})</span>}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Status update */}
+                    <div className="flex items-center gap-2 pt-3 border-t border-stone-100">
+                      <label className="text-xs text-slate-400 font-medium">Update status:</label>
+                      <select
+                        value={po.status}
+                        onChange={(e) => handleUpdatePreOrderStatus(po.id, e.target.value)}
+                        className="text-sm border border-stone-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent bg-white capitalize"
+                      >
+                        {["pending", "confirmed", "amended", "cancelled"].map((s) => (
                           <option key={s} value={s} className="capitalize">{s}</option>
                         ))}
                       </select>
