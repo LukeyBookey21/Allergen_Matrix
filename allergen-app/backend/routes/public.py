@@ -335,7 +335,9 @@ def create_pre_order():
     # Send emails
     try:
         from email_service import send_pre_order_confirmation, send_pre_order_admin_notification
-        send_pre_order_confirmation(pre_order)
+        base_url = request.host_url.rstrip("/")
+        amendment_url = f"{base_url}/pre-order/amend/{pre_order.reference}?token={pre_order.amendment_token}"
+        send_pre_order_confirmation(pre_order, amendment_url=amendment_url)
         send_pre_order_admin_notification(pre_order)
     except Exception as e:
         logger.warning("Email sending failed for pre-order %s: %s", pre_order.reference, e)
@@ -353,6 +355,106 @@ def get_pre_order(ref):
     """Get pre-order details by reference."""
     po = PreOrder.query.filter_by(reference=ref.upper()).first_or_404()
     return jsonify(_serialize_pre_order(po))
+
+
+@public_bp.route("/pre-orders/<ref>/amend", methods=["GET"])
+def get_pre_order_for_amendment(ref):
+    """Get pre-order details for amendment. Requires token."""
+    token = request.args.get("token", "")
+    po = PreOrder.query.filter_by(reference=ref.upper()).first_or_404()
+
+    if not token or po.amendment_token != token:
+        return jsonify({"error": "Invalid amendment link"}), 403
+
+    if po.status == "cancelled":
+        return jsonify({"error": "This pre-order has been cancelled"}), 400
+
+    # Check 24hr deadline
+    from datetime import datetime, timedelta
+    try:
+        booking_dt = datetime.strptime(f"{po.booking_date} {po.booking_time}", "%Y-%m-%d %H:%M")
+        if datetime.now() > booking_dt - timedelta(hours=24):
+            return jsonify({"error": "Amendments must be made at least 24 hours before your booking", "deadline_passed": True}), 400
+    except:
+        pass  # If date parsing fails, allow amendment
+
+    return jsonify({**_serialize_pre_order(po), "amendment_token": po.amendment_token})
+
+
+@public_bp.route("/pre-orders/<ref>/amend", methods=["PUT"])
+def amend_pre_order(ref):
+    """Customer amends their pre-order. Requires token."""
+    token = request.args.get("token", "")
+    po = PreOrder.query.filter_by(reference=ref.upper()).first_or_404()
+
+    if not token or po.amendment_token != token:
+        return jsonify({"error": "Invalid amendment link"}), 403
+
+    if po.status == "cancelled":
+        return jsonify({"error": "This pre-order has been cancelled"}), 400
+
+    # Check 24hr deadline
+    from datetime import datetime, timedelta
+    try:
+        booking_dt = datetime.strptime(f"{po.booking_date} {po.booking_time}", "%Y-%m-%d %H:%M")
+        if datetime.now() > booking_dt - timedelta(hours=24):
+            return jsonify({"error": "Amendments must be made at least 24 hours before your booking"}), 400
+    except:
+        pass
+
+    data = request.get_json()
+    guests_data = data.get("guests", [])
+
+    if not guests_data or len(guests_data) != po.party_size:
+        return jsonify({"error": f"Expected {po.party_size} guests"}), 400
+
+    # Update special notes
+    po.special_notes = data.get("special_notes", po.special_notes)
+    po.status = "amended"
+
+    # Delete existing guests and items, recreate
+    for guest in po.guests:
+        for item in guest.items:
+            db.session.delete(item)
+        db.session.delete(guest)
+    db.session.flush()
+
+    # Recreate guests
+    for i, guest_data in enumerate(guests_data):
+        guest = PreOrderGuest(
+            pre_order_id=po.id,
+            guest_name=guest_data.get("name", f"Guest {i+1}").strip()[:100],
+            position=i + 1,
+            dietary_notes=guest_data.get("dietary_notes", ""),
+            allergen_names=",".join(guest_data.get("allergens", [])),
+        )
+        db.session.add(guest)
+        db.session.flush()
+
+        for course_data in guest_data.get("courses", []):
+            item = PreOrderItem(
+                guest_id=guest.id,
+                menu_item_id=course_data.get("menu_item_id"),
+                course=course_data.get("course", ""),
+                skipped=course_data.get("skipped", False),
+                customisations=json.dumps(course_data.get("customisations", {})),
+                notes=course_data.get("notes", ""),
+            )
+            db.session.add(item)
+
+    db.session.commit()
+
+    # Send updated confirmation email
+    try:
+        from email_service import send_pre_order_confirmation, send_pre_order_admin_notification
+        base_url = request.host_url.rstrip("/")
+        amendment_url = f"{base_url}/pre-order/amend/{po.reference}?token={po.amendment_token}"
+        send_pre_order_confirmation(po, amendment_url=amendment_url)
+        send_pre_order_admin_notification(po)
+    except Exception as e:
+        logger.warning("Amendment email failed: %s", e)
+
+    return jsonify({"message": "Pre-order amended successfully", "reference": po.reference})
 
 
 def _serialize_pre_order(po):

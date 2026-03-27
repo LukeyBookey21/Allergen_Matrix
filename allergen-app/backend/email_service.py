@@ -41,7 +41,7 @@ def _send_email(to_email, subject, html_content):
         return False
 
 
-def send_pre_order_confirmation(pre_order):
+def send_pre_order_confirmation(pre_order, amendment_url=None):
     """Send confirmation email to customer after pre-order."""
     restaurant = current_app.config.get("RESTAURANT_NAME", "Curious Kitchen")
 
@@ -108,6 +108,7 @@ def send_pre_order_confirmation(pre_order):
             </div>
 
             <p style="font-size:13px;color:#94a3b8;margin-top:32px;">If you need to make changes, please contact us directly quoting your reference number <strong>{pre_order.reference}</strong>.</p>
+            {'<p style="margin-top:16px;"><a href="' + amendment_url + '" style="display:inline-block;background:#d97706;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:14px;">Amend Your Order</a></p>' if amendment_url else ''}
         </div>
 
         <div style="background:#f8fafc;padding:20px;text-align:center;border-radius:0 0 12px 12px;border-top:1px solid #e2e8f0;">

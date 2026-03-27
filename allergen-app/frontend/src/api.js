@@ -266,6 +266,32 @@ export async function submitPreOrder(data) {
   } catch { return { error: "Network error" }; }
 }
 
+export async function getPreOrderForAmendment(ref, token) {
+  try {
+    const res = await fetch(`/api/pre-orders/${ref}/amend?token=${token}`);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { error: err.error || "Failed to load pre-order" };
+    }
+    return await res.json();
+  } catch { return { error: "Network error" }; }
+}
+
+export async function submitPreOrderAmendment(ref, token, data) {
+  try {
+    const res = await fetch(`/api/pre-orders/${ref}/amend?token=${token}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return { error: err.error || "Amendment failed" };
+    }
+    return await res.json();
+  } catch { return { error: "Network error" }; }
+}
+
 export async function getPreOrderStatus(ref) {
   try {
     const res = await fetch(`/api/pre-orders/${ref}`);

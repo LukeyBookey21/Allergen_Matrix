@@ -126,6 +126,7 @@ class PreOrder(db.Model):
     booking_date = db.Column(db.String(20), nullable=False)  # "2026-04-15"
     booking_time = db.Column(db.String(10), nullable=False)  # "19:00"
     special_notes = db.Column(db.Text, default="")
+    amendment_token = db.Column(db.String(64), default=lambda: secrets.token_hex(16))
     status = db.Column(db.String(30), default="pending")  # pending, confirmed, amended, cancelled
     payment_status = db.Column(db.String(30), default="unpaid")  # unpaid, deposit, paid
     created_at = db.Column(db.DateTime, default=db.func.now())
