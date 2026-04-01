@@ -82,7 +82,7 @@ export default function DishRow({ dish, selectedAllergens = [], mode = "warn", h
         {onAddToCart && (
           <button
             onClick={() => onAddToCart(dish)}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center transition-all duration-200 hover:bg-amber-600 active:scale-95 text-lg font-bold shadow-sm mt-0.5"
+            className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-amber-500 text-white flex items-center justify-center transition-all duration-200 hover:bg-amber-600 active:scale-95 text-lg font-bold shadow-sm mt-0.5 ml-1"
             aria-label={`Add ${dish.name} to order`}
           >
             +

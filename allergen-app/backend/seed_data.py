@@ -150,7 +150,7 @@ SAMPLE_DISHES = [
         "price": 4.50,
         "category": "Sides",
         "ingredients": "seasonal vegetables\nbutter",
-        "dietary": "V,VG,GF",
+        "dietary": "V,GF",
     },
     {
         "menu_slug": "dinner",
@@ -182,7 +182,7 @@ SAMPLE_DISHES = [
         "price": 4.00,
         "category": "Nibbles",
         "ingredients": "cashew nuts\nhoney",
-        "dietary": "V,VG,GF",
+        "dietary": "V,GF",
     },
     {
         "menu_slug": "bar-lounge",

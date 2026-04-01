@@ -194,6 +194,7 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
               <span className="text-base font-semibold text-slate-800">Total</span>
               <span className="text-lg font-bold text-slate-800">£{(subtotal * 1.10).toFixed(2)}</span>
             </div>
+            <p className="text-[11px] text-slate-400 text-center">An optional 10% service charge is included</p>
 
             {/* Order notes */}
             <textarea
@@ -229,13 +230,16 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
             </div>
 
             {/* Email for receipt */}
-            <input
-              type="email"
-              placeholder="Email for receipt (optional)"
-              value={customerEmail}
-              onChange={(e) => setCustomerEmail(e.target.value)}
-              className="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent"
-            />
+            <div>
+              <label className="block text-xs text-slate-400 mb-1 ml-1">Email for receipt (optional)</label>
+              <input
+                type="email"
+                placeholder="you@email.com"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                className="w-full text-sm bg-stone-50 border border-stone-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-amber-400 focus:border-transparent"
+              />
+            </div>
 
             {/* Error message */}
             {error && (

@@ -668,7 +668,7 @@ export default function PreOrder() {
                 >
                   <div className="flex-1 min-w-0 mr-3">
                     <p className="font-medium text-slate-800 text-sm truncate">{drink.name}</p>
-                    {drink.price && (
+                    {drink.price != null && Number(drink.price) > 0 && (
                       <p className="text-xs text-slate-500">&pound;{Number(drink.price).toFixed(2)}</p>
                     )}
                   </div>

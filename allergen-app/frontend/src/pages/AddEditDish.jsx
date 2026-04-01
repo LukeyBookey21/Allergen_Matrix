@@ -44,7 +44,7 @@ const ALLERGEN_EMOJIS = {
   "Tree Nuts": "\ud83c\udf30",
 };
 
-const CATEGORIES = ["Starters", "Mains", "Desserts", "Sides"];
+const CATEGORIES = ["Starters", "Mains", "Desserts", "Sides", "Nibbles", "Light Bites", "Sandwiches", "Scones", "Sweet Treats", "Wine", "Beer", "Cocktails", "Soft Drinks", "Hot Drinks", "Bottles", "Specials"];
 
 export default function AddEditDish() {
   const { id } = useParams();

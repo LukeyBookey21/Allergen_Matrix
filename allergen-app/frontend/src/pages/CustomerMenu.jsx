@@ -44,7 +44,9 @@ export default function CustomerMenu() {
   const [pairingsMap, setPairingsMap] = useState({});
   const [error, setError] = useState(null);
   const [dietaryFilters, setDietaryFilters] = useState([]);
-  const [lang, setLang] = useState("en");
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem("ck-lang") || "en"; } catch { return "en"; }
+  });
   const [translations, setTranslations] = useState({});
   const [showGdprModal, setShowGdprModal] = useState(false);
   const [gdprEmail, setGdprEmail] = useState("");
@@ -113,8 +115,9 @@ export default function CustomerMenu() {
     return translations[key] || fallback;
   }
 
-  // Fetch translations when language changes
+  // Persist language and fetch translations when language changes
   useEffect(() => {
+    try { localStorage.setItem("ck-lang", lang); } catch {}
     if (lang === "en") {
       setTranslations({});
       return;
@@ -581,7 +584,7 @@ export default function CustomerMenu() {
       {cart.length > 0 && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed bottom-6 right-6 z-40 bg-amber-500 text-white w-14 h-14 rounded-full shadow-lg hover:bg-amber-600 transition-all hover:scale-105 flex items-center justify-center"
+          className="fixed bottom-20 sm:bottom-6 right-6 z-40 bg-amber-500 text-white w-14 h-14 rounded-full shadow-lg hover:bg-amber-600 transition-all hover:scale-105 flex items-center justify-center"
         >
           <span className="text-xl">&#x1F6D2;</span>
           <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center">
@@ -628,6 +631,7 @@ export default function CustomerMenu() {
                         <span className="text-slate-700">Total</span>
                         <span className="text-slate-800">£{(orderSubtotal * 1.10).toFixed(2)}</span>
                       </div>
+                      <p className="text-[10px] text-slate-400 text-center mt-1">An optional 10% service charge is included</p>
                     </>
                   );
                 })()}

@@ -24,8 +24,14 @@ def get_menus():
     for m in menus:
         available = True
         if m.active_from and m.active_to:
-            if not (m.active_from <= current_time <= m.active_to):
-                available = False
+            if m.active_from <= m.active_to:
+                # Normal range, e.g. "12:00" to "22:00"
+                if not (m.active_from <= current_time <= m.active_to):
+                    available = False
+            else:
+                # Midnight crossover, e.g. "22:00" to "02:00"
+                if not (current_time >= m.active_from or current_time <= m.active_to):
+                    available = False
         if m.available_days:
             days = [d.strip().lower() for d in m.available_days.split(",")]
             if current_day not in days:
@@ -561,6 +567,8 @@ def gdpr_forget():
         po.phone = ""
         count += 1
     db.session.commit()
+    if count == 0:
+        return jsonify({"message": "No data found for that email address. If you believe this is an error, please contact us directly.", "records_affected": 0})
     return jsonify({"message": f"Data associated with {email} has been removed", "records_affected": count})
 
 
