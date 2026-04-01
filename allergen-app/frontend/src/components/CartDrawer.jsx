@@ -181,8 +181,18 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
           <div className="border-t border-stone-100 px-6 py-4 space-y-3 bg-white">
             {/* Subtotal */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-500">Subtotal</span>
-              <span className="text-lg font-bold text-slate-800">£{subtotal.toFixed(2)}</span>
+              <span className="text-sm text-slate-500">Subtotal</span>
+              <span className="text-sm text-slate-700">£{subtotal.toFixed(2)}</span>
+            </div>
+            {/* Service charge */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-500">Service charge (10%)</span>
+              <span className="text-sm text-slate-700">£{(subtotal * 0.10).toFixed(2)}</span>
+            </div>
+            {/* Total */}
+            <div className="flex items-center justify-between pt-2 border-t border-stone-200">
+              <span className="text-base font-semibold text-slate-800">Total</span>
+              <span className="text-lg font-bold text-slate-800">£{(subtotal * 1.10).toFixed(2)}</span>
             </div>
 
             {/* Order notes */}
@@ -250,7 +260,7 @@ export default function CartDrawer({ items, onUpdateQuantity, onRemoveItem, onUp
                   Placing order...
                 </span>
               ) : (
-                `Place Order - £${subtotal.toFixed(2)}`
+                `Place Order — £${(subtotal * 1.10).toFixed(2)}`
               )}
             </button>
           </div>

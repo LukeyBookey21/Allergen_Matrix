@@ -3,8 +3,9 @@ import logging
 import string
 import random
 
-from flask import Blueprint, jsonify, request
-from models import db, MenuItem, Allergen, Menu, Order, OrderItem, Pairing, DishOption, PreOrder, PreOrderGuest, PreOrderItem
+from datetime import datetime, timedelta
+from flask import Blueprint, jsonify, request, current_app
+from models import db, MenuItem, Allergen, Menu, Order, OrderItem, Pairing, DishOption, PreOrder, PreOrderGuest, PreOrderItem, Translation
 
 logger = logging.getLogger(__name__)
 
@@ -15,17 +16,33 @@ public_bp = Blueprint("public", __name__, url_prefix="/api")
 def get_menus():
     """Return all active menus ordered by display_order."""
     menus = Menu.query.filter_by(active=True).order_by(Menu.display_order).all()
-    return jsonify([
-        {
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    current_day = now.strftime("%a").lower()[:3]
+
+    result = []
+    for m in menus:
+        available = True
+        if m.active_from and m.active_to:
+            if not (m.active_from <= current_time <= m.active_to):
+                available = False
+        if m.available_days:
+            days = [d.strip().lower() for d in m.available_days.split(",")]
+            if current_day not in days:
+                available = False
+        result.append({
             "id": m.id,
             "name": m.name,
             "slug": m.slug,
             "description": m.description,
             "icon": m.icon,
             "display_order": m.display_order,
-        }
-        for m in menus
-    ])
+            "active_from": m.active_from,
+            "active_to": m.active_to,
+            "available_days": m.available_days,
+            "currently_available": available,
+        })
+    return jsonify(result)
 
 
 @public_bp.route("/menu", methods=["GET"])
@@ -162,12 +179,18 @@ def create_order():
             "notes": oi.notes,
         })
 
+    # Calculate service charge
+    service_rate = current_app.config.get("SERVICE_CHARGE_RATE", 0.10)
+    service_charge = round(total * service_rate, 2)
+    order.service_charge = service_charge
+    db.session.commit()
+
     # Send emails
     try:
         from email_service import send_order_admin_notification, send_order_customer_receipt
         send_order_admin_notification(order, order_items, total)
         if customer_email:
-            send_order_customer_receipt(order, order_items, total)
+            send_order_customer_receipt(order, order_items, total, service_charge=service_charge)
     except Exception as e:
         logger.warning("Email sending failed for order %s: %s", order.id, e)
 
@@ -179,7 +202,9 @@ def create_order():
         "notes": order.notes,
         "status": order.status,
         "items": order_items,
-        "total": round(total, 2),
+        "subtotal": round(total, 2),
+        "service_charge": service_charge,
+        "total": round(total + service_charge, 2),
         "message": "Order placed",
     }), 201
 
@@ -207,7 +232,9 @@ def get_order_status(order_id):
         "table_number": order.table_number,
         "status": order.status,
         "items": order_items,
-        "total": round(total, 2),
+        "subtotal": round(total, 2),
+        "service_charge": order.service_charge or 0.0,
+        "total": round(total + (order.service_charge or 0.0), 2),
         "created_at": order.created_at.isoformat() if order.created_at else None,
     })
 
@@ -509,3 +536,41 @@ def _serialize_pre_order(po):
         "guests": guests,
         "created_at": po.created_at.isoformat() if po.created_at else None,
     }
+
+
+@public_bp.route("/gdpr/forget", methods=["POST"])
+def gdpr_forget():
+    """Customer requests data deletion by email."""
+    data = request.get_json()
+    email = data.get("email", "").strip()
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+    # Anonymize all orders with this email
+    orders = Order.query.filter_by(customer_email=email).all()
+    count = 0
+    for order in orders:
+        order.customer_name = ""
+        order.customer_email = ""
+        order.notes = ""
+        count += 1
+    # Also anonymize pre-orders
+    pre_orders = PreOrder.query.filter_by(email=email).all()
+    for po in pre_orders:
+        po.contact_name = "Anonymized"
+        po.email = ""
+        po.phone = ""
+        count += 1
+    db.session.commit()
+    return jsonify({"message": f"Data associated with {email} has been removed", "records_affected": count})
+
+
+@public_bp.route("/translations", methods=["GET"])
+def get_translations():
+    lang = request.args.get("lang", "en")
+    if lang == "en":
+        return jsonify({})  # English is default, no translations needed
+    translations = Translation.query.filter_by(language=lang).all()
+    result = {}
+    for t in translations:
+        result[t.key] = t.value
+    return jsonify(result)

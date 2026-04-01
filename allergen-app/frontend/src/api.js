@@ -378,3 +378,11 @@ export async function getAllergyMatrix(allergens, menuSlug) {
     return await res.json();
   } catch { return null; }
 }
+
+export async function getTranslations(lang) {
+  try {
+    const res = await fetch(`/api/translations?lang=${lang}`);
+    if (!res.ok) return {};
+    return await res.json();
+  } catch { return {}; }
+}

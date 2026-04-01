@@ -1,5 +1,5 @@
 """Seed the database with full restaurant menu dishes across all menus."""
-from models import db, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Pairing, DishOption
+from models import db, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Pairing, DishOption, Translation
 from parser import parse_and_detect
 
 
@@ -928,4 +928,48 @@ def seed_pairings():
             )
             db.session.add(p)
 
+    db.session.commit()
+
+
+def seed_translations():
+    """Seed UI translations for Spanish, French and German."""
+    if Translation.query.first():
+        return
+    UI_TRANSLATIONS = [
+        # Spanish
+        ("ui.menu_title", "es", "Nuestro Men\u00fa"),
+        ("ui.allergic_to", "es", "Soy al\u00e9rgico a..."),
+        ("ui.warn_mode", "es", "Avisar"),
+        ("ui.hide_mode", "es", "Ocultar"),
+        ("ui.your_order", "es", "Tu Pedido"),
+        ("ui.place_order", "es", "Hacer Pedido"),
+        ("ui.table_number", "es", "N\u00famero de Mesa"),
+        ("ui.no_dishes_match", "es", "No hay platos que coincidan con tus criterios"),
+        ("ui.staff_login", "es", "Acceso personal"),
+        ("ui.group_preorder", "es", "\u00bfGrupo? Pre-ordena para 8+"),
+        # French
+        ("ui.menu_title", "fr", "Notre Menu"),
+        ("ui.allergic_to", "fr", "Je suis allergique \u00e0..."),
+        ("ui.warn_mode", "fr", "Pr\u00e9venir"),
+        ("ui.hide_mode", "fr", "Masquer"),
+        ("ui.your_order", "fr", "Votre Commande"),
+        ("ui.place_order", "fr", "Passer la Commande"),
+        ("ui.table_number", "fr", "Num\u00e9ro de Table"),
+        ("ui.no_dishes_match", "fr", "Aucun plat ne correspond \u00e0 vos crit\u00e8res"),
+        ("ui.staff_login", "fr", "Connexion personnel"),
+        ("ui.group_preorder", "fr", "Groupe? Pr\u00e9-commandez pour 8+"),
+        # German
+        ("ui.menu_title", "de", "Unsere Speisekarte"),
+        ("ui.allergic_to", "de", "Ich bin allergisch gegen..."),
+        ("ui.warn_mode", "de", "Warnen"),
+        ("ui.hide_mode", "de", "Ausblenden"),
+        ("ui.your_order", "de", "Ihre Bestellung"),
+        ("ui.place_order", "de", "Bestellen"),
+        ("ui.table_number", "de", "Tischnummer"),
+        ("ui.no_dishes_match", "de", "Keine Gerichte entsprechen Ihren Kriterien"),
+        ("ui.staff_login", "de", "Mitarbeiter-Login"),
+        ("ui.group_preorder", "de", "Gruppe? Vorbestellung f\u00fcr 8+"),
+    ]
+    for key, lang, value in UI_TRANSLATIONS:
+        db.session.add(Translation(key=key, language=lang, value=value))
     db.session.commit()

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { getMenus, getMenuBySlug, getAllergens, submitOrder, getPairings } from "../api";
+import { getMenus, getMenuBySlug, getAllergens, submitOrder, getPairings, getTranslations } from "../api";
 import DishRow from "../components/DishRow";
 import AllergenDrawer from "../components/AllergenDrawer";
 import CartDrawer from "../components/CartDrawer";
@@ -44,6 +44,12 @@ export default function CustomerMenu() {
   const [pairingsMap, setPairingsMap] = useState({});
   const [error, setError] = useState(null);
   const [dietaryFilters, setDietaryFilters] = useState([]);
+  const [lang, setLang] = useState("en");
+  const [translations, setTranslations] = useState({});
+  const [showGdprModal, setShowGdprModal] = useState(false);
+  const [gdprEmail, setGdprEmail] = useState("");
+  const [gdprResult, setGdprResult] = useState(null);
+  const [gdprSubmitting, setGdprSubmitting] = useState(false);
 
   // Load menus list and allergens on mount
   useEffect(() => {
@@ -101,6 +107,20 @@ export default function CustomerMenu() {
       loadMenu(menu);
     }
   }, [menuSlug, menus]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Translation helper
+  function t(key, fallback) {
+    return translations[key] || fallback;
+  }
+
+  // Fetch translations when language changes
+  useEffect(() => {
+    if (lang === "en") {
+      setTranslations({});
+      return;
+    }
+    getTranslations(lang).then(setTranslations);
+  }, [lang]);
 
   async function loadMenu(menu) {
     setMenuLoading(true);
@@ -255,7 +275,7 @@ export default function CustomerMenu() {
       <div className="min-h-screen bg-amber-50/30 flex items-center justify-center">
         <div className="text-center">
           <div className="inline-block w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
-          <p className="text-slate-400 text-sm font-medium tracking-wide">Loading menu...</p>
+          <p className="text-slate-400 text-sm font-medium tracking-wide">{t("ui.loading_menu", "Loading menu...")}</p>
         </div>
       </div>
     );
@@ -353,20 +373,28 @@ export default function CustomerMenu() {
               ref={tabsRef}
               className="max-w-3xl mx-auto px-2 flex gap-1 overflow-x-auto scrollbar-hide py-2"
             >
-              {menus.map((menu) => (
-                <button
-                  key={menu.slug}
-                  onClick={() => handleMenuTab(menu)}
-                  className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                    activeMenu?.slug === menu.slug
-                      ? "bg-amber-500/20 text-amber-300"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
-                  }`}
-                >
-                  <span className="text-base">{getMenuEmoji(menu.slug)}</span>
-                  {menu.name}
-                </button>
-              ))}
+              {menus.map((menu) => {
+                const isAvailable = menu.currently_available !== false;
+                return (
+                  <button
+                    key={menu.slug}
+                    onClick={() => handleMenuTab(menu)}
+                    className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${!isAvailable ? "opacity-50" : ""} ${
+                      activeMenu?.slug === menu.slug
+                        ? "bg-amber-500/20 text-amber-300"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-base">{getMenuEmoji(menu.slug)}</span>
+                      {menu.name}
+                    </span>
+                    {!isAvailable && menu.active_from && (
+                      <span className="text-[9px] text-slate-400 block">From {menu.active_from}</span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -414,6 +442,16 @@ export default function CustomerMenu() {
           </div>
         )}
 
+        {/* Unavailable menu banner */}
+        {activeMenu && activeMenu.currently_available === false && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4 text-center text-sm text-amber-700">
+            {t("ui.menu_available", "This menu is available")} {activeMenu.active_from}&ndash;{activeMenu.active_to}
+            {activeMenu.available_days && activeMenu.available_days !== "mon,tue,wed,thu,fri,sat,sun" && (
+              <span> ({activeMenu.available_days})</span>
+            )}
+          </div>
+        )}
+
         {menuLoading ? (
           <div className="text-center py-16">
             <div className="inline-block w-6 h-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mb-3" />
@@ -423,8 +461,8 @@ export default function CustomerMenu() {
           <div className="text-center py-16 animate-fade-in">
             <p className="text-slate-400 text-sm">
               {selectedAllergens.length > 0
-                ? "No dishes match your allergen filters. Try adjusting your selections."
-                : "No dishes available at the moment."}
+                ? t("ui.no_dishes_match", "No dishes match your allergen filters. Try adjusting your selections.")
+                : t("ui.no_dishes_available", "No dishes available at the moment.")}
             </p>
             {selectedAllergens.length > 0 && (
               <button
@@ -434,7 +472,7 @@ export default function CustomerMenu() {
                 }}
                 className="mt-3 text-sm font-medium text-amber-600 hover:text-amber-700 transition-colors"
               >
-                Clear all filters
+                {t("ui.clear_filters", "Clear all filters")}
               </button>
             )}
           </div>
@@ -474,14 +512,19 @@ export default function CustomerMenu() {
       <footer className="border-t border-stone-200/60 bg-white/60">
         <div className="max-w-3xl mx-auto px-4 py-8 text-center">
           <p className="text-[11px] text-slate-400 leading-relaxed max-w-md mx-auto mb-4">
-            Please inform your server of any allergies or dietary requirements.
-            Whilst we take every care, we cannot guarantee that any dish is
-            completely free from allergens.
+            {t("ui.allergen_disclaimer", "Please inform your server of any allergies or dietary requirements. Whilst we take every care, we cannot guarantee that any dish is completely free from allergens.")}
           </p>
           <div className="flex items-center justify-center gap-4">
             <Link to="/pre-order" className="text-sm text-amber-600 hover:text-amber-700 font-medium transition-colors">
-              Group dining? Pre-order for 8+
+              {t("ui.pre_order", "Group dining? Pre-order for 8+")}
             </Link>
+            <span className="text-slate-300">|</span>
+            <button
+              onClick={() => setShowGdprModal(true)}
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {t("ui.privacy", "Privacy & Data")}
+            </button>
             <span className="text-slate-300">|</span>
             <Link
               to="/admin/login"
@@ -489,6 +532,22 @@ export default function CustomerMenu() {
             >
               Staff login
             </Link>
+          </div>
+          <div className="flex items-center justify-center gap-3 mt-3">
+            {[
+              { code: "en", label: "English" },
+              { code: "es", label: "Espa\u00f1ol" },
+              { code: "fr", label: "Fran\u00e7ais" },
+              { code: "de", label: "Deutsch" },
+            ].map(l => (
+              <button
+                key={l.code}
+                onClick={() => { setLang(l.code); }}
+                className={`text-xs ${lang === l.code ? "text-amber-600 font-semibold" : "text-slate-400 hover:text-slate-600"}`}
+              >
+                {l.label}
+              </button>
+            ))}
           </div>
         </div>
       </footer>
@@ -553,10 +612,25 @@ export default function CustomerMenu() {
                     <span className="text-slate-500">£{(Number(item.dish.price) * item.quantity).toFixed(2)}</span>
                   </div>
                 ))}
-                <div className="border-t border-stone-200 mt-2 pt-2 flex justify-between font-semibold text-sm">
-                  <span className="text-slate-700">Total</span>
-                  <span className="text-slate-800">£{orderPlaced.items.reduce((sum, item) => sum + Number(item.dish.price) * item.quantity, 0).toFixed(2)}</span>
-                </div>
+                {(() => {
+                  const orderSubtotal = orderPlaced.items.reduce((sum, item) => sum + Number(item.dish.price) * item.quantity, 0);
+                  return (
+                    <>
+                      <div className="border-t border-stone-200 mt-2 pt-2 flex justify-between text-sm">
+                        <span className="text-slate-500">Subtotal</span>
+                        <span className="text-slate-700">£{orderSubtotal.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-500">Service charge (10%)</span>
+                        <span className="text-slate-700">£{(orderSubtotal * 0.10).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between font-semibold text-sm pt-1">
+                        <span className="text-slate-700">Total</span>
+                        <span className="text-slate-800">£{(orderSubtotal * 1.10).toFixed(2)}</span>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             )}
             <p className="text-slate-500 text-sm mb-4">Your server will be with you shortly.</p>
@@ -577,6 +651,44 @@ export default function CustomerMenu() {
                 Back to Menu
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* GDPR modal */}
+      {showGdprModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="font-semibold text-slate-800 mb-2">{t("ui.gdpr_title", "Your Data & Privacy")}</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              {t("ui.gdpr_description", "We store your name and email only to process your order. To request deletion of your data, enter your email below.")}
+            </p>
+            {gdprResult ? (
+              <div className="bg-green-50 text-green-700 p-3 rounded-xl text-sm mb-4">{gdprResult}</div>
+            ) : (
+              <div className="space-y-3">
+                <input type="email" placeholder={t("ui.your_email", "Your email")} value={gdprEmail}
+                  onChange={e => setGdprEmail(e.target.value)}
+                  className="w-full border border-stone-200 rounded-xl px-3 py-2 text-sm" />
+                <button onClick={async () => {
+                  if (!gdprEmail) return;
+                  setGdprSubmitting(true);
+                  try {
+                    const res = await fetch("/api/gdpr/forget", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({email: gdprEmail}) });
+                    const data = await res.json();
+                    setGdprResult(data.message || "Done");
+                  } catch {
+                    setGdprResult("Request submitted.");
+                  }
+                  setGdprSubmitting(false);
+                }} disabled={gdprSubmitting || !gdprEmail}
+                  className="w-full bg-red-500 text-white py-2 rounded-xl text-sm font-semibold disabled:opacity-50">
+                  {gdprSubmitting ? t("ui.processing", "Processing...") : t("ui.delete_data", "Delete My Data")}
+                </button>
+              </div>
+            )}
+            <button onClick={() => { setShowGdprModal(false); setGdprResult(null); setGdprEmail(""); }}
+              className="mt-3 text-sm text-slate-400 hover:text-slate-600 w-full text-center">{t("ui.close", "Close")}</button>
           </div>
         </div>
       )}

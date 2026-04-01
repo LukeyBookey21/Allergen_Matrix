@@ -4,6 +4,8 @@ import sys
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_login import LoginManager
 from werkzeug.security import generate_password_hash
 
@@ -11,9 +13,16 @@ logger = logging.getLogger(__name__)
 
 from config import Config
 from models import db, AdminUser, seed_allergens, seed_menus
-from seed_data import seed_dishes
+from seed_data import seed_dishes, seed_translations
 from routes.admin import admin_bp
 from routes.public import public_bp
+
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
 
 def create_app():
     app = Flask(__name__, static_folder=None)
@@ -24,6 +33,9 @@ def create_app():
 
     # Database
     db.init_app(app)
+
+    # Rate limiting
+    limiter.init_app(app)
 
     # Login manager
     login_manager = LoginManager()
@@ -41,6 +53,12 @@ def create_app():
     # Register blueprints
     app.register_blueprint(admin_bp)
     app.register_blueprint(public_bp)
+
+    # Apply rate limits to specific routes
+    limiter.limit("5 per minute")(app.view_functions["admin.login"])
+    limiter.limit("10 per minute")(app.view_functions["public.create_order"])
+    limiter.limit("10 per minute")(app.view_functions["public.create_pre_order"])
+    limiter.limit("20 per minute")(app.view_functions["public.gdpr_forget"])
 
     # Serve React frontend in production
     frontend_build = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -60,6 +78,7 @@ def create_app():
             seed_allergens()
             seed_menus()
             seed_dishes()
+            seed_translations()
         except Exception as e:
             logger.error("Seed data failed: %s", e)
             db.session.rollback()

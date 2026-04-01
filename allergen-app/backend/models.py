@@ -23,6 +23,9 @@ class Menu(db.Model):
     icon = db.Column(db.String(10), default="")  # emoji icon
     display_order = db.Column(db.Integer, default=0)
     active = db.Column(db.Boolean, default=True)
+    active_from = db.Column(db.String(5), default="")  # "12:00" or empty for always
+    active_to = db.Column(db.String(5), default="")    # "21:30" or empty for always
+    available_days = db.Column(db.String(50), default="")  # "mon,tue,wed,thu,fri,sat,sun" or empty for all
     items = db.relationship("MenuItem", backref="menu", lazy=True)
 
 
@@ -78,6 +81,7 @@ class Order(db.Model):
     customer_email = db.Column(db.String(200), default="")
     notes = db.Column(db.Text, default="")
     lookup_token = db.Column(db.String(64), default=lambda: secrets.token_hex(16))
+    service_charge = db.Column(db.Float, default=0.0)
     status = db.Column(db.String(30), default="pending")  # pending, confirmed, preparing, ready, served, cancelled
     created_at = db.Column(db.DateTime, default=db.func.now())
     updated_at = db.Column(db.DateTime, default=db.func.now(), onupdate=db.func.now())
@@ -157,6 +161,15 @@ class PreOrderItem(db.Model):
     menu_item = db.relationship("MenuItem")
 
 
+class Translation(db.Model):
+    __tablename__ = "translation"
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(200), nullable=False)  # e.g. "dish.42.name" or "ui.menu_title"
+    language = db.Column(db.String(5), nullable=False)  # "es", "fr", "de"
+    value = db.Column(db.Text, nullable=False)
+    __table_args__ = (db.UniqueConstraint('key', 'language', name='uq_translation_key_lang'),)
+
+
 SEED_ALLERGENS = [
     ("Celery", "\U0001f33f"),
     ("Gluten", "\U0001f33e"),
@@ -183,11 +196,11 @@ def seed_allergens():
 
 
 SEED_MENUS = [
-    {"name": "Dinner Menu", "slug": "dinner", "description": "The Curious Kitchen evening menu", "icon": "\U0001f37d\ufe0f", "display_order": 1},
-    {"name": "Bar & Lounge", "slug": "bar-lounge", "description": "All-day bar and lounge menu", "icon": "\U0001f378", "display_order": 2},
-    {"name": "Afternoon Tea", "slug": "afternoon-tea", "description": "Traditional afternoon tea - \u00a328.95 per person. Add Prosecco \u00a334.95 / Champagne \u00a339.95", "icon": "\U0001fad6", "display_order": 3},
-    {"name": "Sunday Lunch", "slug": "sunday-lunch", "description": "Sunday roast and classics", "icon": "\U0001f969", "display_order": 4},
-    {"name": "Drinks", "slug": "drinks", "description": "Wines, cocktails, beers and spirits", "icon": "\U0001f377", "display_order": 5},
+    {"name": "Dinner Menu", "slug": "dinner", "description": "The Curious Kitchen evening menu", "icon": "\U0001f37d\ufe0f", "display_order": 1, "active_from": "18:00", "active_to": "22:00", "available_days": "mon,tue,wed,thu,fri,sat,sun"},
+    {"name": "Bar & Lounge", "slug": "bar-lounge", "description": "All-day bar and lounge menu", "icon": "\U0001f378", "display_order": 2, "active_from": "10:00", "active_to": "23:00", "available_days": "mon,tue,wed,thu,fri,sat,sun"},
+    {"name": "Afternoon Tea", "slug": "afternoon-tea", "description": "Traditional afternoon tea - \u00a328.95 per person. Add Prosecco \u00a334.95 / Champagne \u00a339.95", "icon": "\U0001fad6", "display_order": 3, "active_from": "14:00", "active_to": "17:00", "available_days": "mon,tue,wed,thu,fri,sat,sun"},
+    {"name": "Sunday Lunch", "slug": "sunday-lunch", "description": "Sunday roast and classics", "icon": "\U0001f969", "display_order": 4, "active_from": "12:00", "active_to": "16:00", "available_days": "sun"},
+    {"name": "Drinks", "slug": "drinks", "description": "Wines, cocktails, beers and spirits", "icon": "\U0001f377", "display_order": 5, "active_from": "10:00", "active_to": "23:00", "available_days": "mon,tue,wed,thu,fri,sat,sun"},
 ]
 
 

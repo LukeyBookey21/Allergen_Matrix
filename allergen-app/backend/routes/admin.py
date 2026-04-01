@@ -8,7 +8,7 @@ import io
 import qrcode
 from flask import send_file
 
-from models import db, AdminUser, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Order, OrderItem, Pairing, DishOption, PreOrder, PreOrderGuest, PreOrderItem
+from models import db, AdminUser, Menu, MenuItem, Ingredient, Allergen, MenuItemAllergen, Order, OrderItem, Pairing, DishOption, PreOrder, PreOrderGuest, PreOrderItem, Translation
 from parser import parse_and_detect
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -65,6 +65,9 @@ def list_menus():
             "icon": m.icon,
             "display_order": m.display_order,
             "active": m.active,
+            "active_from": m.active_from,
+            "active_to": m.active_to,
+            "available_days": m.available_days,
         }
         for m in menus
     ])
@@ -91,6 +94,9 @@ def create_menu():
         icon=data.get("icon", ""),
         display_order=data.get("display_order", 0),
         active=data.get("active", True),
+        active_from=data.get("active_from", ""),
+        active_to=data.get("active_to", ""),
+        available_days=data.get("available_days", ""),
     )
     db.session.add(menu)
     db.session.commit()
@@ -117,6 +123,9 @@ def update_menu(menu_id):
     menu.icon = data.get("icon", menu.icon)
     menu.display_order = data.get("display_order", menu.display_order)
     menu.active = data.get("active", menu.active)
+    menu.active_from = data.get("active_from", menu.active_from)
+    menu.active_to = data.get("active_to", menu.active_to)
+    menu.available_days = data.get("available_days", menu.available_days)
     db.session.commit()
     return jsonify({"message": "Menu updated"})
 
@@ -951,3 +960,59 @@ def allergy_matrix():
         "safe": safe,
         "unsafe": unsafe,
     })
+
+
+# ── GDPR ──────────────────────────────────────────
+
+@admin_bp.route("/gdpr/purge", methods=["POST"])
+@chef_required
+def gdpr_purge():
+    """Purge old orders (GDPR compliance)."""
+    from gdpr import purge_old_orders
+    data = request.get_json() or {}
+    days = data.get("days", 90)
+    count = purge_old_orders(days=days)
+    return jsonify({"purged": count, "days": days})
+
+
+@admin_bp.route("/gdpr/anonymize/<int:order_id>", methods=["POST"])
+@login_required
+def gdpr_anonymize(order_id):
+    """Anonymize a specific order."""
+    from gdpr import anonymize_order
+    success = anonymize_order(order_id)
+    if success:
+        return jsonify({"message": "Order anonymized"})
+    return jsonify({"error": "Order not found"}), 404
+
+
+# ── Translations ──────────────────────────────────────────
+
+@admin_bp.route("/translations", methods=["GET"])
+@login_required
+def list_translations():
+    lang = request.args.get("lang", "")
+    query = Translation.query
+    if lang:
+        query = query.filter_by(language=lang)
+    translations = query.all()
+    return jsonify([{"id": t.id, "key": t.key, "language": t.language, "value": t.value} for t in translations])
+
+
+@admin_bp.route("/translations", methods=["POST"])
+@chef_required
+def create_translation():
+    data = request.get_json()
+    t = Translation(key=data.get("key", ""), language=data.get("language", ""), value=data.get("value", ""))
+    db.session.add(t)
+    db.session.commit()
+    return jsonify({"id": t.id}), 201
+
+
+@admin_bp.route("/translations/<int:tid>", methods=["DELETE"])
+@chef_required
+def delete_translation(tid):
+    t = Translation.query.get_or_404(tid)
+    db.session.delete(t)
+    db.session.commit()
+    return jsonify({"message": "Deleted"})

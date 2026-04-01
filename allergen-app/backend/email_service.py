@@ -201,7 +201,7 @@ def send_pre_order_admin_notification(pre_order):
     )
 
 
-def send_order_customer_receipt(order, order_items, total):
+def send_order_customer_receipt(order, order_items, total, service_charge=0.0):
     """Send receipt/confirmation email to customer for a table order."""
     if not order.customer_email:
         return
@@ -223,10 +223,13 @@ def send_order_customer_receipt(order, order_items, total):
             <td style="padding:8px 0;border-bottom:1px solid #f1f5f9;text-align:right;color:#334155;font-size:14px;font-weight:500;">£{line_total:.2f}</td>
         </tr>'''
 
+    # Service charge
+    grand_total = total + service_charge
+
     # VAT calculation (UK standard 20%)
     vat_rate = 0.20
-    net_total = total / (1 + vat_rate)
-    vat_amount = total - net_total
+    net_total = grand_total / (1 + vat_rate)
+    vat_amount = grand_total - net_total
 
     now = datetime.now()
 
@@ -262,8 +265,12 @@ def send_order_customer_receipt(order, order_items, total):
             <div style="border-top:2px solid #1e293b;padding-top:12px;margin-top:8px;">
                 <table style="width:100%;font-size:14px;">
                     <tr>
-                        <td style="padding:4px 0;color:#64748b;">Subtotal (ex. VAT)</td>
-                        <td style="padding:4px 0;text-align:right;color:#334155;">£{net_total:.2f}</td>
+                        <td style="padding:4px 0;color:#64748b;">Subtotal</td>
+                        <td style="padding:4px 0;text-align:right;color:#334155;">£{total:.2f}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:4px 0;color:#64748b;">Service Charge (10%)</td>
+                        <td style="padding:4px 0;text-align:right;color:#334155;">£{service_charge:.2f}</td>
                     </tr>
                     <tr>
                         <td style="padding:4px 0;color:#64748b;">VAT (20%)</td>
@@ -271,7 +278,7 @@ def send_order_customer_receipt(order, order_items, total):
                     </tr>
                     <tr>
                         <td style="padding:8px 0;font-weight:bold;font-size:18px;color:#1e293b;">Total</td>
-                        <td style="padding:8px 0;text-align:right;font-weight:bold;font-size:18px;color:#1e293b;">£{total:.2f}</td>
+                        <td style="padding:8px 0;text-align:right;font-weight:bold;font-size:18px;color:#1e293b;">£{grand_total:.2f}</td>
                     </tr>
                 </table>
             </div>
