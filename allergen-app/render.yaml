@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: allergen-matrix
+    runtime: python
+    buildCommand: cd allergen-app/frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt
+    startCommand: cd allergen-app/backend && gunicorn "app:create_app()"
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
